@@ -1,0 +1,27 @@
+#' @param significant_mets A data frame containing metabolites that showed significant differences in t-tests.
+#' @param data_0_1R A data frame containing metabolite concentrations for ACR 0/1R samples.
+#' @param data_2R_plus A data frame containing metabolite concentrations for ACR 2R+ samples.
+
+plot_ttest_bars <- function(significant_mets, data_0_1R, data_2R_plus) {
+    data_0_1R$ACR <- "0/1R"
+    data_2R_plus$ACR <- "2R+"
+    plot_data <- bind_rows(data_0_1R, data_2R_plus) %>%
+    pivot_longer(cols = -ACR, names_to = "Metabolite", values_to = "Value") %>%
+    filter(Metabolite %in% significant_mets$Metabolite)
+    plot_list <- lapply(significant_mets$Metabolite, function(met){
+    df <- filter(plot_data, Metabolite == met)
+    ggplot(df, aes(x = ACR, y = Value, fill = ACR)) +
+        geom_bar(stat = "summary", fun = "mean", position = "dodge", alpha = 0.7, width = 0.4) +
+        geom_jitter(width = 0.1, size = 2, alpha = 0.9, color = 'black') +
+        scale_y_continuous(
+        limits = c(0, max(df$Value, na.rm = TRUE) * 1.2),
+        breaks = seq(0, max(df$Value, na.rm = TRUE) * 1.2, 5),
+        minor_breaks = seq(0, max(df$Value, na.rm = TRUE) * 1.2, 2.5)
+        ) +
+        labs(title = met, y = "Concentration", x = "ACR Status") +
+        theme_minimal() +
+        theme(legend.position = "none")
+    })
+    names(plot_list) <- significant_mets$Metabolite
+    return(plot_list) 
+}

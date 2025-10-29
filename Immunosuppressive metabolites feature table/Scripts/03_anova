@@ -1,0 +1,22 @@
+#* Perform ANOVA between ACR 0R, 1R, and 2R+ for each metabolite
+    anova_res <- lapply(seq_along(acr_0r), function(i) {
+    df <- data.frame(
+        Value = c(acr_0r[[i]], acr_1r[[i]], acr_2r[[i]]),
+        ACR = factor(rep(c("0R", "1R", "2R+"), times = c(nrow(acr_0r), nrow(acr_1r), nrow(acr_2r))))
+    )
+    anova <- aov(Value ~ ACR, data = df)
+    tukey <- TukeyHSD(anova)
+    p_01 <- tukey$ACR["1R-0R", "p adj"]
+    p_02 <- tukey$ACR["2R+-0R", "p adj"]
+    p_12 <- tukey$ACR["2R+-1R", "p adj"]
+    as.tibble(data.frame(
+        Metabolite = colnames(acr_0r)[i],
+        Mean_0R = mean(acr_0r[[i]], na.rm = TRUE),
+        Mean_1R = mean(acr_1r[[i]], na.rm = TRUE),
+        Mean_2R_plus = mean(acr_2r[[i]], na.rm = TRUE),
+        p_01 = p_01,
+        p_02 = p_02,
+        p_12 = p_12
+    ))
+})
+anova_res <- bind_rows(anova_res)

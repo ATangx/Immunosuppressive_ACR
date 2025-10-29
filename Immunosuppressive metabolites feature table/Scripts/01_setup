@@ -1,0 +1,16 @@
+#* Import feature table with metadata and set up tables for comparisons
+    data_path <- "C://Users//amshu//Documents//Amshu//Emory//Research//Immunosuppressive metabolites feature table"
+    metabolite_data <- as.tibble(read.csv(file.path(data_path, "IS_metabolites_ACR.csv")))
+    # Create 3 separate tables by ACR status
+    acr_0r <- metabolite_data %>%
+      filter(ACR == "0R") %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+    acr_1r <- metabolite_data %>%
+      filter(ACR == "1R") %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+    acr_0_1r <- metabolite_data %>%
+      filter(ACR %in% c("0R", "1R")) %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+    acr_2r <- metabolite_data %>%
+      filter(ACR == "2R+") %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
