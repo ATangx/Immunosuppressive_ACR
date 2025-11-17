@@ -1,22 +1,26 @@
 #* Perform ANOVA between ACR 0R, 1R, and 2R+ for each metabolite
     anova_res <- lapply(seq_along(acr_0r), function(i) {
     df <- data.frame(
-        Value = c(acr_0r[[i]], acr_1r[[i]], acr_2r[[i]]),
-        ACR = factor(rep(c("0R", "1R", "2R+"), times = c(nrow(acr_0r), nrow(acr_1r), nrow(acr_2r))))
+        Value = c(pre_2R[, 6:(ncol(pre_2R)-1)][[i]], active_2R[, 6:(ncol(active_2R)-1)][[i]], post_2R[, 6:(ncol(post_2R)-1)][[i]]),
+        ACR = factor(rep(c("pre 2R", "active 2R", "post 2R"), times = c(nrow(pre_2R), nrow(active_2R), nrow(post_2R))))
     )
     anova <- aov(Value ~ ACR, data = df)
+    anova_summary <- summary(anova)
+    anova_p <- anova_summary[[1]][["Pr(>F)"]][1]
     tukey <- TukeyHSD(anova)
-    p_01 <- tukey$ACR["1R-0R", "p adj"]
-    p_02 <- tukey$ACR["2R+-0R", "p adj"]
-    p_12 <- tukey$ACR["2R+-1R", "p adj"]
+    p_post_act <- tukey$ACR["post 2R-active 2R", "p adj"]
+    p_pre_post <- tukey$ACR["pre 2R-post 2R", "p adj"]
+    p_pre_act <- tukey$ACR["pre 2R-active 2R", "p adj"]
     as.tibble(data.frame(
-        Metabolite = colnames(acr_0r)[i],
-        Mean_0R = mean(acr_0r[[i]], na.rm = TRUE),
-        Mean_1R = mean(acr_1r[[i]], na.rm = TRUE),
-        Mean_2R_plus = mean(acr_2r[[i]], na.rm = TRUE),
-        p_01 = p_01,
-        p_02 = p_02,
-        p_12 = p_12
+        Metabolite = colnames(pre_2R[, 6:(ncol(pre_2R)-1)])[i],
+        Mean_pre = mean(pre_2R[, 6:(ncol(pre_2R)-1)][[i]], na.rm = TRUE),
+        Mean_active = mean(active_2R[, 6:(ncol(active_2R)-1)][[i]], na.rm = TRUE),
+        Mean_post = mean(post_2R[, 6:(ncol(post_2R)-1)][[i]], na.rm = TRUE),
+        p_post_act = p_post_act,
+        p_pre_post = p_pre_post,
+        p_pre_act = p_pre_act,
+        p_anova = anova_p
     ))
 })
-anova_res <- bind_rows(anova_res)
+anova_res <- as_tibble(bind_rows(anova_res))
+anova_plots <- plot_anova(anova_res)

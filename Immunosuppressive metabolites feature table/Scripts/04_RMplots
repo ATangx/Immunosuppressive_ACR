@@ -1,0 +1,8 @@
+#* Set up tables for plotting longitudinal metabolite levels by patient
+    met_table_unlog <- metabolite_data %>% mutate(across(6:last_col(), ~ 2^.x))
+        acr_colors <- c(
+        "0R" = "lightgreen",
+        "1R" = "goldenrod",
+        "2R+" = "darkred"
+        )
+    plot_RM(metabolite_data, colnames(acr_0r), "./Results/POD_RMplots")

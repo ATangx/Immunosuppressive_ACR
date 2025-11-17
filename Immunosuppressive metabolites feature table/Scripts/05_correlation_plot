@@ -1,0 +1,27 @@
+#* Compare concentration of 2R and 0/1R
+    #+ Calculate mean concentrations by ACR group
+        #- pre-2R vs post-2R
+            conc_diff_prevpost <- tibble(
+            Metabolite = colnames(pre_2R[, 6:(ncol(pre_2R)-1)]),
+            Mean_Conc_pre = c(colMeans(pre_2R[, 6:(ncol(pre_2R)-1)], na.rm = TRUE)),
+            Mean_Conc_post = c(colMeans(post_2R[, 6:(ncol(post_2R)-1)], na.rm = TRUE)),
+            Conc_diff = c(colMeans(post_2R[, 6:(ncol(post_2R)-1)], na.rm = TRUE))/c(colMeans(pre_2R[, 6:(ncol(pre_2R)-1)], na.rm = TRUE))
+            )
+        #- pre-2R vs active-2R
+            conc_diff_prevactive <- tibble(
+            Metabolite = colnames(pre_2R[, 6:(ncol(pre_2R)-1)]),
+            Mean_Conc_pre = c(colMeans(pre_2R[, 6:(ncol(pre_2R)-1)], na.rm = TRUE)),
+            Mean_Conc_active = c(colMeans(active_2R[, 6:(ncol(active_2R)-1)], na.rm = TRUE)),
+            Conc_diff = c(colMeans(active_2R[, 6:(ncol(active_2R)-1)], na.rm = TRUE))/c(colMeans(pre_2R[, 6:(ncol(pre_2R)-1)], na.rm = TRUE))
+            )
+        #- active-2R vs post-2R
+            conc_diff_activepost <- tibble(
+            Metabolite = colnames(active_2R[, 6:(ncol(active_2R)-1)]),
+            Mean_Conc_active = c(colMeans(active_2R[, 6:(ncol(active_2R)-1)], na.rm = TRUE)),
+            Mean_Conc_post = c(colMeans(post_2R[, 6:(ncol(post_2R)-1)], na.rm = TRUE)),
+            Conc_diff = c(colMeans(post_2R[, 6:(ncol(post_2R)-1)], na.rm = TRUE))/c(colMeans(active_2R[, 6:(ncol(active_2R)-1)], na.rm = TRUE))
+            )
+    #+ Plot correlation of mean concentrations between ACR groups
+    conc_corr_plot <- plot_conc_corr(conc_diff_prevpost)
+    conc_corr_plot <- plot_conc_corr(conc_diff_prevactive)
+    conc_corr_plot <- plot_conc_corr(conc_diff_activepost)

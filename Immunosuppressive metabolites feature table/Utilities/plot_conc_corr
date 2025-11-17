@@ -1,0 +1,21 @@
+ plot_conc_corr <- function(df) {
+      df <- df[order(df$Conc_diff, decreasing = TRUE), ]
+      df$Label <- TRUE
+      df$Label[4:(nrow(df)-3)] <- FALSE
+      ggplot(df, aes(x = Mean_Conc_active, y = Mean_Conc_post)) +
+        geom_point() +
+        geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+        geom_text_repel(aes(label = ifelse(Label, Metabolite, NA)), size = 1.5) +
+        labs(
+          title = "Mean Concentration: active-2R vs post-2R",
+          x = "Mean Concentration active-2R",
+          y = "Mean Concentration post-2R"
+        ) +
+        theme_minimal()
+        ggsave(
+          filename = "./Results/Correlation_cat_ACR/Conc_Correlation_ACR_active_vs_post.png",
+          dpi = 300,
+          width = 6,
+          height = 4
+        )
+    }

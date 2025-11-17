@@ -1,0 +1,41 @@
+#' @param data A data frame containing the necessary columns: H (patient ID), ACR (ACR group), S (sample number), POD (post-operative day), and metabolite intensity columns.
+#' @param met_cols A character vector of metabolite column names to plot.
+#' @param save_dir A string specifying the directory to save the plots.
+
+plot_RM <- function(data, met_cols, save_dir) {
+    data$S <- as.numeric(sub("^S", "", data$S))
+    for (met in met_cols) {
+        met_dir <- file.path(save_dir, met)
+        dir.create(met_dir, showWarnings = FALSE)
+        met_data <- data %>%
+        select(H, ACR, S, POD, all_of(met)) %>%
+        mutate(z_met = as.numeric(scale(.[[met]])))
+        for (p in unique(met_data$H)) {
+            met_data_p <- met_data %>% filter(H == p)
+            # Skip if patient has fewer than 3 samples or only 1 ACR group
+            if (length(unique(met_data_p$ACR)) < 2) next
+            if (nrow(met_data_p) < 3) next
+            ggplot(met_data_p, aes(x = as.numeric(POD), y = z_met)) +
+                geom_point(aes(color = ACR), size = 2.5, alpha = 0.8) +
+                geom_smooth(method = "loess", se = FALSE, color = "gray", linewidth = 0.8) +
+                scale_color_manual(values = acr_colors) +
+                labs(
+                    x = "Post-Transplant Sample Number",
+                    y = "Intensity"
+                ) +
+                theme_minimal() +
+                theme(
+                    axis.text.x = element_text(angle = 45, hjust = 1),
+                    legend.position = "right",
+                    strip.text = element_text(size = 10, face = "bold"),
+                    axis.title = element_text(size = 12)
+                )
+            ggsave(
+                filename = file.path(met_dir, paste0("Patient_", p, "_", met, "_POD_RM_plot.png")),
+                width = 6,
+                height = 4,
+                dpi = 300
+            )
+        }
+    }
+}
