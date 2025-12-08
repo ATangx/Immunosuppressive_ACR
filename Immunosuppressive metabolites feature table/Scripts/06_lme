@@ -1,0 +1,23 @@
+#* Linear mixed effects modeling of metabolite levels vs ACR status
+    #+ Load necessary libraries
+        library(lme4)
+        library(lmerTest)
+    #+ Prepare data for LME modeling
+        lme_data <- rbind(pre_2R, active_2R, post_2R)
+        lme_data_long <- lme_data %>%
+          pivot_longer(
+            cols = 6:(ncol(lme_data)-1),
+            names_to = "Metabolite",
+            values_to = "Concentration"
+          )
+    #+ Fit LME models for each metabolite
+        mixed_res <- lme_data_long %>%
+            group_by(Metabolite) %>%
+            nest() %>%
+            mutate(
+                model = map(data, ~ lmer(Concentration ~ ACR_Label + (1 | H), data = .x)),
+                emms  = map(model, ~ emmeans(.x, pairwise ~ ACR_Label)),
+                contrasts = map(emms, ~ as.data.frame(.x$contrasts))
+            ) %>%
+            select(Metabolite, contrasts) %>%
+            unnest(contrasts)

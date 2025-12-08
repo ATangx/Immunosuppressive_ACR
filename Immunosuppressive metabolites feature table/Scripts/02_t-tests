@@ -17,7 +17,7 @@
 #* OPTIONAL: Save plots to files
     for (met in names(ttest_bars)) {
         ggsave(
-            filename = paste0(met, "_ACR_plot.png"),
+            filename = paste0("./Results/", met, "_ACR_plot.png"),
             plot = ttest_bars[[met]],
             dpi = 300
         )
