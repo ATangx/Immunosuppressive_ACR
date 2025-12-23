@@ -1,6 +1,4 @@
-# Source libraries
 source("Immunosuppressive metabolites feature table/Scripts/01_libraries")
-
 #* Import feature table with metadata and set up tables for comparisons
     data_path <- "/Users/ailintang/Desktop/Immunosuppressive_ACR/Immunosuppressive metabolites feature table"
     metabolite_data <- as_tibble(read.csv(file.path(data_path, "IS_metabolites_ACR.csv")))
