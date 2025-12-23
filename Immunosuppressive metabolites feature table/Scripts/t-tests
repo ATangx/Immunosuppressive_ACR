@@ -22,7 +22,7 @@
         #* OPTIONAL: Save plots to files
         for (met in names(ttest_bars)) {
             ggsave(
-                filename = paste0("./Immunosuppressive metabolites feature table/Results/", met, "_ACR_plot_AT.png"),
+                filename = paste0("./Immunosuppressive metabolites feature table/Results2/", met, "_ACR_plot_AT.png"),
                 plot = ttest_bars[[met]],
                 dpi = 300
             )

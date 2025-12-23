@@ -307,8 +307,8 @@ if(nrow(all_summaries) > 0) {
   # Export combined results
   if(length(all_results_export) > 0) {
     combined_export <- bind_rows(all_results_export)
-    write_csv(combined_export, "Immunosuppressive metabolites feature table/Results/POD_Stratified_Complete_Analysis.csv")
-    write_csv(all_summaries, "Immunosuppressive metabolites feature table/Results/POD_Stratified_Summary.csv")
+    write_csv(combined_export, "Immunosuppressive metabolites feature table/Results2/POD_Stratified_Complete_Analysis.csv")
+    write_csv(all_summaries, "Immunosuppressive metabolites feature table/Results2/POD_Stratified_Summary.csv")
     cat("\nResults exported to:\n")
     cat("- POD_Stratified_Complete_Analysis.csv (all detailed results)\n")
     cat("- POD_Stratified_Summary.csv (summary table)\n")
@@ -539,7 +539,7 @@ create_plots_for_stratum <- function(stratum_results, stratum_name, stratum_data
             
             # Save plots
             for (met in names(ttest_plots)) {
-                filename <- paste0("./Immunosuppressive metabolites feature table/Results/", 
+                filename <- paste0("./Immunosuppressive metabolites feature table/Results2/", 
                                  gsub("[^A-Za-z0-9]", "_", stratum_name), "_", met, "_TTest_plot.png")
                 ggsave(filename, plot = ttest_plots[[met]], dpi = 300, width = 8, height = 6)
                 plot_count <- plot_count + 1
@@ -565,7 +565,7 @@ create_plots_for_stratum <- function(stratum_results, stratum_name, stratum_data
             
             # Save plots
             for (met in names(wilcox_plots)) {
-                filename <- paste0("./Immunosuppressive metabolites feature table/Results/", 
+                filename <- paste0("./Immunosuppressive metabolites feature table/Results2/", 
                                  gsub("[^A-Za-z0-9]", "_", stratum_name), "_", met, "_Wilcoxon_plot.png")
                 ggsave(filename, plot = wilcox_plots[[met]], dpi = 300, width = 8, height = 6)
                 plot_count <- plot_count + 1
@@ -643,7 +643,7 @@ export_individual_results <- function(results_list, analysis_prefix) {
     
     # Export t-test results
     if(!is.null(stratum_results$ttest) && nrow(stratum_results$ttest) > 0) {
-      ttest_file <- paste0("./Immunosuppressive metabolites feature table/Results/TTest_", 
+      ttest_file <- paste0("./Immunosuppressive metabolites feature table/Results2/TTest_", 
                           analysis_prefix, "_", clean_stratum_name, ".csv")
       write_csv(stratum_results$ttest, ttest_file)
       cat("Exported t-test results for", analysis_prefix, stratum_name, "to:", ttest_file, "\n")
@@ -651,7 +651,7 @@ export_individual_results <- function(results_list, analysis_prefix) {
     
     # Export Wilcoxon log2 results
     if(!is.null(stratum_results$wilcoxon_log2) && nrow(stratum_results$wilcoxon_log2) > 0) {
-      wilcox_log2_file <- paste0("./Immunosuppressive metabolites feature table/Results/WilcoxonLog2_", 
+      wilcox_log2_file <- paste0("./Immunosuppressive metabolites feature table/Results2/WilcoxonLog2_", 
                                 analysis_prefix, "_", clean_stratum_name, ".csv")
       write_csv(stratum_results$wilcoxon_log2, wilcox_log2_file)
       cat("Exported Wilcoxon log2 results for", analysis_prefix, stratum_name, "to:", wilcox_log2_file, "\n")
@@ -659,7 +659,7 @@ export_individual_results <- function(results_list, analysis_prefix) {
     
     # Export Wilcoxon non-log2 results
     if(!is.null(stratum_results$wilcoxon_nonlog2) && nrow(stratum_results$wilcoxon_nonlog2) > 0) {
-      wilcox_nonlog2_file <- paste0("./Immunosuppressive metabolites feature table/Results/WilcoxonNonLog2_", 
+      wilcox_nonlog2_file <- paste0("./Immunosuppressive metabolites feature table/Results2/WilcoxonNonLog2_", 
                                    analysis_prefix, "_", clean_stratum_name, ".csv")
       write_csv(stratum_results$wilcoxon_nonlog2, wilcox_nonlog2_file)
       cat("Exported Wilcoxon non-log2 results for", analysis_prefix, stratum_name, "to:", wilcox_nonlog2_file, "\n")
@@ -667,7 +667,7 @@ export_individual_results <- function(results_list, analysis_prefix) {
     
     # Export patient-level results
     if(!is.null(stratum_results$patient_level) && nrow(stratum_results$patient_level) > 0) {
-      patient_file <- paste0("./Immunosuppressive metabolites feature table/Results/PatientLevel_", 
+      patient_file <- paste0("./Immunosuppressive metabolites feature table/Results2/PatientLevel_", 
                             analysis_prefix, "_", clean_stratum_name, ".csv")
       write_csv(stratum_results$patient_level, patient_file)
       cat("Exported patient-level results for", analysis_prefix, stratum_name, "to:", patient_file, "\n")
@@ -781,25 +781,25 @@ if(length(results_median) > 0) {
 # Export combined results by test type
 if(length(all_ttest_results) > 0) {
   combined_ttest <- bind_rows(all_ttest_results)
-  write_csv(combined_ttest, "./Immunosuppressive metabolites feature table/Results/POD_Combined_TTest_All_Strata.csv")
+  write_csv(combined_ttest, "./Immunosuppressive metabolites feature table/Results2/POD_Combined_TTest_All_Strata.csv")
   cat("Exported combined t-test results across all strata to: POD_Combined_TTest_All_Strata.csv\n")
 }
 
 if(length(all_wilcox_log2_results) > 0) {
   combined_wilcox_log2 <- bind_rows(all_wilcox_log2_results)
-  write_csv(combined_wilcox_log2, "./Immunosuppressive metabolites feature table/Results/POD_Combined_WilcoxonLog2_All_Strata.csv")
+  write_csv(combined_wilcox_log2, "./Immunosuppressive metabolites feature table/Results2/POD_Combined_WilcoxonLog2_All_Strata.csv")
   cat("Exported combined Wilcoxon log2 results across all strata to: POD_Combined_WilcoxonLog2_All_Strata.csv\n")
 }
 
 if(length(all_wilcox_nonlog2_results) > 0) {
   combined_wilcox_nonlog2 <- bind_rows(all_wilcox_nonlog2_results)
-  write_csv(combined_wilcox_nonlog2, "./Immunosuppressive metabolites feature table/Results/POD_Combined_WilcoxonNonLog2_All_Strata.csv")
+  write_csv(combined_wilcox_nonlog2, "./Immunosuppressive metabolites feature table/Results2/POD_Combined_WilcoxonNonLog2_All_Strata.csv")
   cat("Exported combined Wilcoxon non-log2 results across all strata to: POD_Combined_WilcoxonNonLog2_All_Strata.csv\n")
 }
 
 if(length(all_patient_results) > 0) {
   combined_patient <- bind_rows(all_patient_results)
-  write_csv(combined_patient, "./Immunosuppressive metabolites feature table/Results/POD_Combined_PatientLevel_All_Strata.csv")
+  write_csv(combined_patient, "./Immunosuppressive metabolites feature table/Results2/POD_Combined_PatientLevel_All_Strata.csv")
   cat("Exported combined patient-level results across all strata to: POD_Combined_PatientLevel_All_Strata.csv\n")
 }
 
@@ -878,7 +878,7 @@ if(exists("combined_patient")) {
 
 # Export significance summary
 if(nrow(significance_summary) > 0) {
-  write_csv(significance_summary, "./Immunosuppressive metabolites feature table/Results/POD_Significance_Summary_All_Tests.csv")
+  write_csv(significance_summary, "./Immunosuppressive metabolites feature table/Results2/POD_Significance_Summary_All_Tests.csv")
   cat("Exported comprehensive significance summary to: POD_Significance_Summary_All_Tests.csv\n")
   
   # Display summary
@@ -908,7 +908,7 @@ if(length(stratum_table1_results) > 0) {
         }
         
         # Save comprehensive Table 1 document
-        table1_path <- "./Immunosuppressive metabolites feature table/Results/POD_Stratified_Table1_All_Strata.docx"
+        table1_path <- "./Immunosuppressive metabolites feature table/Results2/POD_Stratified_Table1_All_Strata.docx"
         print(doc, target = table1_path)
         cat("Successfully exported all POD-stratified Table 1s to:", table1_path, "\n")
         
@@ -917,7 +917,7 @@ if(length(stratum_table1_results) > 0) {
         
         # Save as CSV if Word export fails
         for(stratum_name in names(stratum_table1_results)) {
-            csv_path <- paste0("./Immunosuppressive metabolites feature table/Results/POD_Table1_", 
+            csv_path <- paste0("./Immunosuppressive metabolites feature table/Results2/POD_Table1_", 
                              gsub("[^A-Za-z0-9]", "_", stratum_name), ".csv")
             write.csv(stratum_table1_results[[stratum_name]]$data, csv_path, row.names = FALSE)
         }
@@ -954,7 +954,7 @@ if(length(all_clinical_tables) > 0) {
         }
         
         # Save comprehensive clinical format document
-        clinical_path <- "./Immunosuppressive metabolites feature table/Results/POD_Stratified_Clinical_Format_All_Tables.docx"
+        clinical_path <- "./Immunosuppressive metabolites feature table/Results2/POD_Stratified_Clinical_Format_All_Tables.docx"
         print(doc, target = clinical_path)
         cat("Successfully exported all POD-stratified clinical format tables to:", clinical_path, "\n")
         
@@ -966,7 +966,7 @@ if(length(all_clinical_tables) > 0) {
             clinical_results <- all_clinical_tables[[stratum_key]]
             
             for(analysis_type in names(clinical_results)) {
-                csv_path <- paste0("./Immunosuppressive metabolites feature table/Results/POD_Clinical_", 
+                csv_path <- paste0("./Immunosuppressive metabolites feature table/Results2/POD_Clinical_", 
                                  gsub("[^A-Za-z0-9]", "_", stratum_key), "_", analysis_type, ".csv")
                 write.csv(clinical_results[[analysis_type]], csv_path, row.names = FALSE)
             }

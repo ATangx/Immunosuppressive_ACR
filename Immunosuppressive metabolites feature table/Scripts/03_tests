@@ -37,7 +37,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
             # Save plots to files
             for (met in names(ttest_bars)) {
                 ggsave(
-                    filename = paste0("./Immunosuppressive metabolites feature table/Results/", met, "_T-test_plot_AT.png"),
+                    filename = paste0("./Immunosuppressive metabolites feature table/Results2/", met, "_T-test_plot_AT.png"),
                     plot = ttest_bars[[met]],
                     dpi = 300,
                     width = 8, height = 6
@@ -96,7 +96,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         # Save plots to files
         for (met in names(ttest_bars_median)) {
             ggsave(
-                filename = paste0("./Immunosuppressive metabolites feature table/Results/", met, "_Wilcoxon_plot_AT.png"),
+                filename = paste0("./Immunosuppressive metabolites feature table/Results2/", met, "_Wilcoxon_plot_AT.png"),
                 plot = ttest_bars_median[[met]],
                 dpi = 300,
                 width = 8, height = 6
@@ -150,7 +150,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
             # Save plots to files
             for (met in names(wilcox_bars_nonlog2)) {
                 ggsave(
-                    filename = paste0("./Immunosuppressive metabolites feature table/Results/", met, "_Wilcoxon_NonLog2_plot_AT.png"),
+                    filename = paste0("./Immunosuppressive metabolites feature table/Results2/", met, "_Wilcoxon_NonLog2_plot_AT.png"),
                     plot = wilcox_bars_nonlog2[[met]],
                     dpi = 300,
                     width = 8, height = 6
@@ -239,7 +239,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         # Save patient-level plots to files
         for (met in names(ttest_bars_median_patient)) {
             ggsave(
-                filename = paste0("./Immunosuppressive metabolites feature table/Results/", met, "_Patient_Level_Wilcoxon_plot_AT.png"),
+                filename = paste0("./Immunosuppressive metabolites feature table/Results2/", met, "_Patient_Level_Wilcoxon_plot_AT.png"),
                 plot = ttest_bars_median_patient[[met]],
                 dpi = 300,
                 width = 8, height = 6
@@ -470,7 +470,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
             flextable::autofit()
         
         # Export to Word
-        output_path_table1 <- "./Immunosuppressive metabolites feature table/Results/Table1_Metabolite_Levels_By_ACR_Status.docx"
+        output_path_table1 <- "./Immunosuppressive metabolites feature table/Results2/Table1_Metabolite_Levels_By_ACR_Status.docx"
         
         flex_table1_metabolites %>%
             flextable::save_as_docx(path = output_path_table1)
@@ -495,7 +495,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
             )
         
         write.csv(table1_summary_data, 
-                  "./Immunosuppressive metabolites feature table/Results/Table1_Metabolite_Summary_Data.csv", 
+                  "./Immunosuppressive metabolites feature table/Results2/Table1_Metabolite_Summary_Data.csv", 
                   row.names = FALSE)
         
         cat("Table 1 summary data saved as CSV.\n")
@@ -506,7 +506,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         
         # Save raw data if Word export fails
         write.csv(table1_data, 
-                  "./Immunosuppressive metabolites feature table/Results/Table1_Raw_Data.csv", 
+                  "./Immunosuppressive metabolites feature table/Results2/Table1_Raw_Data.csv", 
                   row.names = FALSE)
         cat("Table 1 raw data saved as CSV.\n")
     })
@@ -608,7 +608,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         flextable::bold(part = "header")
     
     # Export clinical format tables to Word
-    clinical_output_path <- "./Immunosuppressive metabolites feature table/Results/Metabolomics_Clinical_Format_All_Tables.docx"
+    clinical_output_path <- "./Immunosuppressive metabolites feature table/Results2/Metabolomics_Clinical_Format_All_Tables.docx"
     
     tryCatch({
         # Create comprehensive clinical format document
@@ -625,10 +625,10 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         cat("Successfully exported all clinical format tables to:", clinical_output_path, "\n")
         
         # Also save individual clinical tables
-        clinical_ttest_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Clinical_TTest_Results.docx")
-        clinical_wilcox_log2_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Clinical_Wilcoxon_Log2_Results.docx")
-        clinical_wilcox_nonlog2_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Clinical_Wilcoxon_NonLog2_Results.docx")
-        clinical_patient_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Clinical_Patient_Level_Results.docx")
+        clinical_ttest_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results2/Clinical_TTest_Results.docx")
+        clinical_wilcox_log2_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results2/Clinical_Wilcoxon_Log2_Results.docx")
+        clinical_wilcox_nonlog2_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results2/Clinical_Wilcoxon_NonLog2_Results.docx")
+        clinical_patient_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results2/Clinical_Patient_Level_Results.docx")
         
         cat("Individual clinical format tables also saved.\n")
         
@@ -636,10 +636,10 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         cat("Error creating clinical format Word documents:", e$message, "\n")
         
         # Save as CSV if Word export fails
-        write.csv(ttest_clinical, "./Immunosuppressive metabolites feature table/Results/Clinical_TTest_Results.csv", row.names = FALSE)
-        write.csv(wilcox_log2_clinical, "./Immunosuppressive metabolites feature table/Results/Clinical_Wilcoxon_Log2_Results.csv", row.names = FALSE)
-        write.csv(wilcox_nonlog2_clinical, "./Immunosuppressive metabolites feature table/Results/Clinical_Wilcoxon_NonLog2_Results.csv", row.names = FALSE)
-        write.csv(patient_clinical, "./Immunosuppressive metabolites feature table/Results/Clinical_Patient_Level_Results.csv", row.names = FALSE)
+        write.csv(ttest_clinical, "./Immunosuppressive metabolites feature table/Results2/Clinical_TTest_Results.csv", row.names = FALSE)
+        write.csv(wilcox_log2_clinical, "./Immunosuppressive metabolites feature table/Results2/Clinical_Wilcoxon_Log2_Results.csv", row.names = FALSE)
+        write.csv(wilcox_nonlog2_clinical, "./Immunosuppressive metabolites feature table/Results2/Clinical_Wilcoxon_NonLog2_Results.csv", row.names = FALSE)
+        write.csv(patient_clinical, "./Immunosuppressive metabolites feature table/Results2/Clinical_Patient_Level_Results.csv", row.names = FALSE)
         
         cat("Clinical format tables saved as CSV files.\n")
     })

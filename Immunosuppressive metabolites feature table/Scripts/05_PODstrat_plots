@@ -290,8 +290,8 @@ if(nrow(all_summaries) > 0) {
   # Export combined results
   if(length(all_results_export) > 0) {
     combined_export <- bind_rows(all_results_export)
-    write_csv(combined_export, "Immunosuppressive metabolites feature table/Results/POD_Stratified_Complete_Analysis.csv")
-    write_csv(all_summaries, "Immunosuppressive metabolites feature table/Results/POD_Stratified_Summary.csv")
+    write_csv(combined_export, "Immunosuppressive metabolites feature table/Results2/POD_Stratified_Complete_Analysis.csv")
+    write_csv(all_summaries, "Immunosuppressive metabolites feature table/Results2/POD_Stratified_Summary.csv")
     cat("\nResults exported to:\n")
     cat("- POD_Stratified_Complete_Analysis.csv (all detailed results)\n")
     cat("- POD_Stratified_Summary.csv (summary table)\n")
@@ -511,7 +511,7 @@ create_plots_for_stratum <- function(stratum_results, stratum_name, stratum_data
             
             # Save plots
             for (met in names(ttest_plots)) {
-                filename <- paste0("./Immunosuppressive metabolites feature table/Results/", 
+                filename <- paste0("./Immunosuppressive metabolites feature table/Results2/", 
                                  gsub("[^A-Za-z0-9]", "_", stratum_name), "_", met, "_TTest_plot.png")
                 ggsave(filename, plot = ttest_plots[[met]], dpi = 300, width = 8, height = 6)
                 plot_count <- plot_count + 1
@@ -537,7 +537,7 @@ create_plots_for_stratum <- function(stratum_results, stratum_name, stratum_data
             
             # Save plots
             for (met in names(wilcox_plots)) {
-                filename <- paste0("./Immunosuppressive metabolites feature table/Results/", 
+                filename <- paste0("./Immunosuppressive metabolites feature table/Results2/", 
                                  gsub("[^A-Za-z0-9]", "_", stratum_name), "_", met, "_Wilcoxon_plot.png")
                 ggsave(filename, plot = wilcox_plots[[met]], dpi = 300, width = 8, height = 6)
                 plot_count <- plot_count + 1
@@ -609,7 +609,7 @@ if(length(stratum_table1_results) > 0) {
         }
         
         # Save comprehensive Table 1 document
-        table1_path <- "./Immunosuppressive metabolites feature table/Results/POD_Stratified_Table1_All_Strata.docx"
+        table1_path <- "./Immunosuppressive metabolites feature table/Results2/POD_Stratified_Table1_All_Strata.docx"
         print(doc, target = table1_path)
         cat("Successfully exported all POD-stratified Table 1s to:", table1_path, "\n")
         
@@ -618,7 +618,7 @@ if(length(stratum_table1_results) > 0) {
         
         # Save as CSV if Word export fails
         for(stratum_name in names(stratum_table1_results)) {
-            csv_path <- paste0("./Immunosuppressive metabolites feature table/Results/POD_Table1_", 
+            csv_path <- paste0("./Immunosuppressive metabolites feature table/Results2/POD_Table1_", 
                              gsub("[^A-Za-z0-9]", "_", stratum_name), ".csv")
             write.csv(stratum_table1_results[[stratum_name]]$data, csv_path, row.names = FALSE)
         }
@@ -655,7 +655,7 @@ if(length(all_clinical_tables) > 0) {
         }
         
         # Save comprehensive clinical format document
-        clinical_path <- "./Immunosuppressive metabolites feature table/Results/POD_Stratified_Clinical_Format_All_Tables.docx"
+        clinical_path <- "./Immunosuppressive metabolites feature table/Results2/POD_Stratified_Clinical_Format_All_Tables.docx"
         print(doc, target = clinical_path)
         cat("Successfully exported all POD-stratified clinical format tables to:", clinical_path, "\n")
         
@@ -667,7 +667,7 @@ if(length(all_clinical_tables) > 0) {
             clinical_results <- all_clinical_tables[[stratum_key]]
             
             for(analysis_type in names(clinical_results)) {
-                csv_path <- paste0("./Immunosuppressive metabolites feature table/Results/POD_Clinical_", 
+                csv_path <- paste0("./Immunosuppressive metabolites feature table/Results2/POD_Clinical_", 
                                  gsub("[^A-Za-z0-9]", "_", stratum_key), "_", analysis_type, ".csv")
                 write.csv(clinical_results[[analysis_type]], csv_path, row.names = FALSE)
             }

@@ -114,7 +114,7 @@ print(ttest_res_median_patient)
 cat("\n=== CREATING PLOTS FOR PATIENT-LEVEL RESULTS (03_TESTS LOGIC) ===\n")
 
 # Create output directory
-output_dir <- "./Immunosuppressive metabolites feature table/Results/PatientLevel_5b/"
+output_dir <- "./Immunosuppressive metabolites feature table/Results2/PatientLevel_5b/"
 if (!dir.exists(output_dir)) {
   dir.create(output_dir, recursive = TRUE)
 }

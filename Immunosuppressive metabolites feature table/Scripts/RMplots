@@ -5,4 +5,4 @@
         "1R" = "goldenrod",
         "2R+" = "darkred"
         )
-    plot_RM(metabolite_data, colnames(acr_0r), "./Results/POD_RMplots")
+    plot_RM(metabolite_data, colnames(acr_0r), "./Results2/POD_RMplots")

@@ -89,7 +89,7 @@ cat("Eventual 2R+ group:", nrow(acr_eventual_2r_patient), "patients\n\n")
 cat("=== STATISTICAL TESTING (BASELINE PATIENT-LEVEL) ===\n")
 
 # Create results directory
-results_dir <- "Immunosuppressive metabolites feature table/Results/PatientLevel_5c_BaselineOnly"
+results_dir <- "Immunosuppressive metabolites feature table/Results2/PatientLevel_5c_BaselineOnly"
 if (!dir.exists(results_dir)) {
   dir.create(results_dir, recursive = TRUE)
 }

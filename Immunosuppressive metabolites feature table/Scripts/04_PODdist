@@ -220,15 +220,15 @@ pod_clusters <- nonlog2_data %>%
 print(pod_clusters)
 
 # Save plots
-ggsave("./Immunosuppressive metabolites feature table/Results/POD_Patient_Ranges.png", 
+ggsave("./Immunosuppressive metabolites feature table/Results2/POD_Patient_Ranges.png", 
        plot = p1, width = 12, height = 10, dpi = 300)
-ggsave("./Immunosuppressive metabolites feature table/Results/POD_Distribution_Histogram.png", 
+ggsave("./Immunosuppressive metabolites feature table/Results2/POD_Distribution_Histogram.png", 
        plot = p2, width = 10, height = 6, dpi = 300)
-ggsave("./Immunosuppressive metabolites feature table/Results/POD_by_ACR_Status.png", 
+ggsave("./Immunosuppressive metabolites feature table/Results2/POD_by_ACR_Status.png", 
        plot = p3, width = 8, height = 6, dpi = 300)
-ggsave("./Immunosuppressive metabolites feature table/Results/POD_Individual_Samples_Dotplot.png", 
+ggsave("./Immunosuppressive metabolites feature table/Results2/POD_Individual_Samples_Dotplot.png", 
        plot = p4, width = 14, height = 12, dpi = 300)
-ggsave("./Immunosuppressive metabolites feature table/Results/POD_Patient_Trajectories.png", 
+ggsave("./Immunosuppressive metabolites feature table/Results2/POD_Patient_Trajectories.png", 
        plot = p5, width = 14, height = 10, dpi = 300)
 
-cat("\nPOD analysis plots saved to Results folder.\n")
+cat("\nPOD analysis plots saved to Results2 folder.\n")

@@ -61,7 +61,7 @@ cat("2R+ patients (had at least one 2R+ episode):", nrow(acr_2r_patient), "\n")
 cat("\n=== PATIENT-LEVEL STATISTICAL ANALYSES ===\n")
 
 # Create results directory
-results_dir <- "./Immunosuppressive metabolites feature table/Results/PatientLevel/"
+results_dir <- "./Immunosuppressive metabolites feature table/Results2/PatientLevel/"
 if (!dir.exists(results_dir)) {
   dir.create(results_dir, recursive = TRUE)
 }
@@ -215,6 +215,6 @@ write_csv(patient_aggregated, paste0(results_dir, "Aggregated_Data.csv"))
 cat("Exported patient-level aggregated dataset\n")
 
 cat("\n=== PATIENT-LEVEL ANALYSIS COMPLETE ===\n")
-cat("Check the Results/PatientLevel folder for exported results\n")
+cat("Check the Results2/PatientLevel folder for exported results\n")
 cat("This analysis compares patients who never had 2R+ vs patients who had at least one 2R+ episode\n")
 cat("Each patient contributes one data point (median across all their samples)\n")
