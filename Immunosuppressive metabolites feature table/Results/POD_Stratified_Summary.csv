@@ -1,0 +1,8 @@
+Analysis,Stratum,TTest_Significant,TTest_Total,Wilcox_Log2_Significant,Wilcox_Log2_Total,Wilcox_NonLog2_Significant,Wilcox_NonLog2_Total,Patient_Significant,Patient_Total
+Predefined,Early (≤30 days),0,14,0,14,0,14,0,14
+Predefined,Medium (31-90 days),1,14,0,14,0,14,0,0
+Predefined,Late (91-180 days),1,14,0,14,0,14,1,14
+Quartiles,Q1 (Earliest),0,14,0,14,0,14,1,14
+Quartiles,Q2 (Early-Med),0,14,0,14,0,14,0,14
+Quartiles,Q3 (Med-Late),1,14,0,14,0,14,0,0
+Quartiles,Q4 (Latest),1,14,0,14,0,14,1,14

@@ -1,0 +1,236 @@
+# Source the main analysis script first
+source("Immunosuppressive metabolites feature table/Scripts/03_tests")
+
+
+#-=== POD DISTRIBUTION ANALYSIS ===
+
+cat("\n=== ANALYZING POD DISTRIBUTION PER PATIENT ===\n")
+
+# Create comprehensive POD summary
+pod_analysis <- nonlog2_data %>%
+    group_by(H) %>%
+    summarise(
+        n_samples = n(),
+        min_POD = min(POD, na.rm = TRUE),
+        max_POD = max(POD, na.rm = TRUE),
+        median_POD = median(POD, na.rm = TRUE),
+        range_POD = max_POD - min_POD,
+        pod_values = list(POD),
+        acr_types = paste(unique(ACR), collapse = ", "),
+        has_2R = any(grepl("^2R", ACR, ignore.case = TRUE)),
+        .groups = "drop"
+    ) %>%
+    arrange(min_POD)
+
+# Basic statistics
+cat("--- POD Range Summary ---\n")
+cat("Overall POD range:", min(nonlog2_data$POD, na.rm = TRUE), "to", max(nonlog2_data$POD, na.rm = TRUE), "days\n")
+cat("Median POD across all samples:", median(nonlog2_data$POD, na.rm = TRUE), "days\n")
+cat("Patients with >1 sample:", sum(pod_analysis$n_samples > 1), "\n")
+cat("Patients with 2R episodes:", sum(pod_analysis$has_2R), "\n\n")
+
+# Show patient ranges
+cat("--- Patient POD Ranges ---\n")
+print(pod_analysis %>% 
+      select(H, n_samples, min_POD, max_POD, range_POD, acr_types, has_2R) %>%
+      head(20))  # Show first 20 patients
+
+# Create visualization
+library(ggplot2)
+
+# Plot 1: POD ranges per patient (horizontal lines)
+p1 <- pod_analysis %>%
+    mutate(H_ordered = reorder(H, min_POD)) %>%
+    ggplot(aes(y = H_ordered)) +
+    geom_segment(aes(x = min_POD, xend = max_POD, 
+                     color = has_2R), 
+                 size = 1.5, alpha = 0.7) +
+    geom_point(aes(x = min_POD), size = 2, alpha = 0.8) +
+    geom_point(aes(x = max_POD), size = 2, alpha = 0.8) +
+    scale_color_manual(values = c("FALSE" = "blue", "TRUE" = "red"),
+                       labels = c("No 2R", "Has 2R"),
+                       name = "Rejection Status") +
+    labs(title = "POD Sampling Range by Patient",
+         subtitle = "Each line shows the POD range sampled for each patient",
+         x = "Post-Operative Days (POD)",
+         y = "Patient ID") +
+    theme_minimal() +
+    theme(axis.text.y = element_text(size = 6))
+
+print(p1)
+
+# Plot 2: Distribution of all POD values with patient coloring
+p2 <- nonlog2_data %>%
+    mutate(has_2R = H %in% patients_with_2R$H) %>%
+    ggplot(aes(x = POD, fill = has_2R)) +
+    geom_histogram(bins = 30, alpha = 0.7, position = "identity") +
+    scale_fill_manual(values = c("FALSE" = "blue", "TRUE" = "red"),
+                      labels = c("No 2R", "Has 2R"),
+                      name = "Rejection Status") +
+    labs(title = "Distribution of All POD Values",
+         subtitle = "Histogram of sampling timepoints",
+         x = "Post-Operative Days (POD)",
+         y = "Number of Samples") +
+    theme_minimal()
+
+print(p2)
+
+# Plot 3: POD vs ACR status
+p3 <- nonlog2_data %>%
+    ggplot(aes(x = ACR, y = POD, fill = ACR)) +
+    geom_boxplot(alpha = 0.7) +
+    geom_jitter(width = 0.2, alpha = 0.5) +
+    labs(title = "POD Distribution by ACR Status",
+         subtitle = "When do different rejection grades occur?",
+         x = "ACR Grade",
+         y = "Post-Operative Days (POD)") +
+    theme_minimal() +
+    theme(legend.position = "none")
+
+print(p3)
+
+# Plot 4: Dot plot showing individual POD samples per patient
+p4 <- nonlog2_data %>%
+    mutate(
+        H_ordered = reorder(H, POD, median),
+        has_2R = H %in% patients_with_2R$H
+    ) %>%
+    ggplot(aes(x = POD, y = H_ordered)) +
+    geom_point(aes(color = ACR, shape = has_2R), size = 3, alpha = 0.8) +
+    scale_color_manual(
+        values = c("0R" = "green", "1R" = "orange", "2R" = "red", "2RB" = "darkred"),
+        name = "ACR Grade"
+    ) +
+    scale_shape_manual(
+        values = c("FALSE" = 16, "TRUE" = 17),
+        labels = c("No 2R", "Has 2R"),
+        name = "Rejection Status"
+    ) +
+    labs(
+        title = "Individual POD Samples per Patient",
+        subtitle = "Each dot represents one sample, colored by ACR grade",
+        x = "Post-Operative Days (POD)",
+        y = "Patient ID (ordered by median POD)"
+    ) +
+    theme_minimal() +
+    theme(
+        axis.text.y = element_text(size = 8),
+        legend.position = "bottom"
+    ) +
+    guides(
+        color = guide_legend(override.aes = list(size = 4)),
+        shape = guide_legend(override.aes = list(size = 4))
+    )
+
+print(p4)
+
+# Plot 5: Enhanced dot plot with connection lines showing patient trajectories
+p5 <- nonlog2_data %>%
+    group_by(H) %>%
+    mutate(
+        H_ordered = reorder(H, POD, median),
+        has_2R = any(grepl("^2R", ACR, ignore.case = TRUE)),
+        n_samples = n()
+    ) %>%
+    ungroup() %>%
+    filter(n_samples > 1) %>%  # Only show patients with multiple samples
+    ggplot(aes(x = POD, y = H_ordered)) +
+    geom_line(aes(group = H_ordered), color = "gray70", alpha = 0.5, size = 0.5) +
+    geom_point(aes(color = ACR, shape = has_2R), size = 3, alpha = 0.9) +
+    scale_color_manual(
+        values = c("0R" = "green", "1R" = "orange", "2R" = "red", "2RB" = "darkred"),
+        name = "ACR Grade"
+    ) +
+    scale_shape_manual(
+        values = c("FALSE" = 16, "TRUE" = 17),
+        labels = c("No 2R", "Has 2R"),
+        name = "Rejection Status"
+    ) +
+    labs(
+        title = "Patient Trajectories: POD Sampling Timeline",
+        subtitle = "Connected lines show multiple samples from same patient",
+        x = "Post-Operative Days (POD)",
+        y = "Patient ID (patients with multiple samples)"
+    ) +
+    theme_minimal() +
+    theme(
+        axis.text.y = element_text(size = 8),
+        legend.position = "bottom"
+    ) +
+    guides(
+        color = guide_legend(override.aes = list(size = 4)),
+        shape = guide_legend(override.aes = list(size = 4))
+    )
+
+print(p5)
+
+# Overlap analysis
+cat("\n--- POD Overlap Analysis ---\n")
+
+# Find overlapping POD ranges between patients
+overlap_pairs <- expand.grid(i = 1:nrow(pod_analysis), j = 1:nrow(pod_analysis)) %>%
+    filter(i < j) %>%
+    mutate(
+        patient1 = pod_analysis$H[i],
+        patient2 = pod_analysis$H[j],
+        min1 = pod_analysis$min_POD[i],
+        max1 = pod_analysis$max_POD[i],
+        min2 = pod_analysis$min_POD[j],
+        max2 = pod_analysis$max_POD[j],
+        overlap_start = pmax(min1, min2),
+        overlap_end = pmin(max1, max2),
+        overlap_days = pmax(0, overlap_end - overlap_start),
+        has_overlap = overlap_days > 0
+    ) %>%
+    filter(has_overlap) %>%
+    arrange(desc(overlap_days))
+
+cat("Number of patient pairs with overlapping POD ranges:", nrow(overlap_pairs), "\n")
+cat("Total possible pairs:", choose(nrow(pod_analysis), 2), "\n")
+cat("% of pairs with overlap:", round(nrow(overlap_pairs) / choose(nrow(pod_analysis), 2) * 100, 1), "%\n")
+
+if(nrow(overlap_pairs) > 0) {
+    cat("\nTop 10 overlapping patient pairs:\n")
+    print(overlap_pairs %>% 
+          select(patient1, patient2, overlap_days, min1, max1, min2, max2) %>%
+          head(10))
+}
+
+# Common POD timepoints
+cat("\n--- Most Common POD Timepoints ---\n")
+common_pods <- nonlog2_data %>%
+    count(POD, sort = TRUE) %>%
+    head(15)
+print(common_pods)
+
+# POD clustering analysis
+cat("\n--- POD Clustering Analysis ---\n")
+pod_clusters <- nonlog2_data %>%
+    mutate(
+        POD_group = case_when(
+            POD <= 10 ~ "1 week (≤10 days)",
+            POD <= 30 ~ "1 month (≤30 days)",
+            POD <= 60 ~ "1-2 months (31-60 days)",
+            POD <= 90 ~ "2-3 months (61-90 days)",
+            POD <= 180 ~ "3-6 months (91-180 days)",
+            TRUE ~ "Very Late (>180 days)"
+        )
+    ) %>%
+    count(POD_group, ACR) %>%
+    pivot_wider(names_from = ACR, values_from = n, values_fill = 0)
+
+print(pod_clusters)
+
+# Save plots
+ggsave("./Immunosuppressive metabolites feature table/Results/POD_Patient_Ranges.png", 
+       plot = p1, width = 12, height = 10, dpi = 300)
+ggsave("./Immunosuppressive metabolites feature table/Results/POD_Distribution_Histogram.png", 
+       plot = p2, width = 10, height = 6, dpi = 300)
+ggsave("./Immunosuppressive metabolites feature table/Results/POD_by_ACR_Status.png", 
+       plot = p3, width = 8, height = 6, dpi = 300)
+ggsave("./Immunosuppressive metabolites feature table/Results/POD_Individual_Samples_Dotplot.png", 
+       plot = p4, width = 14, height = 12, dpi = 300)
+ggsave("./Immunosuppressive metabolites feature table/Results/POD_Patient_Trajectories.png", 
+       plot = p5, width = 14, height = 10, dpi = 300)
+
+cat("\nPOD analysis plots saved to Results folder.\n")

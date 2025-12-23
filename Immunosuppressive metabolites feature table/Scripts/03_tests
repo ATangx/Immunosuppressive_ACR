@@ -1,0 +1,673 @@
+#- Tests on immunosuppressive metabolites by ACR status pre-2R vs active 2R (ACR 01/2R vs 2R+)
+#! this is taking all samples from patients with at least one 2R episode and comparing all ACR 0/1R vs 2R+ samples
+
+#+ Source libraries, data setup, and plotting functions
+source("Immunosuppressive metabolites feature table/Scripts/01_libraries")
+source("Immunosuppressive metabolites feature table/Scripts/02_setup")
+source("Immunosuppressive metabolites feature table/Scripts/03_plotting_functions")
+
+#=== ANALYSIS 1: T-TESTS ON LOG2 DATA ===
+
+#+ Perform t-tests between ACR 0/1R and 2R+ for each metabolite (using log2 data for proper statistical testing)
+    ttest_res <- lapply(seq_along(acr_0_1r_log2), function(i) {
+    ttest <- t.test(acr_0_1r_log2[[i]], acr_2r_log2[[i]])
+    as_tibble(data.frame(
+        Metabolite = colnames(acr_0_1r_log2)[i],
+        Mean_0_1R_log2 = mean(acr_0_1r_log2[[i]], na.rm = TRUE),
+        Mean_2R_plus_log2 = mean(acr_2r_log2[[i]], na.rm = TRUE),
+        mean_diff_log2 = diff(ttest$estimate),
+        p_value = ttest$p.value
+        ))
+    })
+    ttest_res <- bind_rows(ttest_res)
+
+#+ Plot and save t-test results
+    sig_mets_ttest <- ttest_res %>%
+      filter(p_value < 0.05)
+    
+    cat("T-test results (log2 data):\n")
+    cat("Total metabolites tested:", nrow(ttest_res), "\n")
+    cat("Significant metabolites (p < 0.05):", nrow(sig_mets_ttest), "\n")
+    
+    if (nrow(sig_mets_ttest) > 0) {
+        cat("Significant metabolites (t-test on log2 data):\n")
+        print(sig_mets_ttest)
+        
+        # Create and save plots
+        if (exists("plot_ttest_bars")) {
+            ttest_bars <- plot_ttest_bars(sig_mets_ttest, acr_0_1r, acr_2r, use_median = FALSE)
+            
+            # Save plots to files (using non-log2 data for visualization)
+            for (met in names(ttest_bars)) {
+                ggsave(
+                    filename = paste0("./Immunosuppressive metabolites feature table/Results/Dump_122325/", met, "_T-test_log2_plot_AT.png"),
+                    plot = ttest_bars[[met]],
+                    dpi = 300,
+                    width = 8, height = 6
+                )
+            }
+            cat("Saved", length(ttest_bars), "t-test plots to Results folder.\n")
+        }
+    } else {
+        cat("No significant metabolites found with t-tests.\n")
+    }
+
+#=== ANALYSIS 2: WILCOXON TESTS ON LOG2 DATA ===
+
+#+ Perform Wilcoxon rank-sum tests between ACR 0/1R and 2R+ for each metabolite with median summaries
+    # Use log2 data for statistical testing (more appropriate for normalization)
+    ttest_res_median <- lapply(seq_along(acr_0_1r_log2), function(i) {
+    group1 <- acr_0_1r_log2[[i]]
+    group2 <- acr_2r_log2[[i]]
+    median1 <- median(group1, na.rm = TRUE)
+    median2 <- median(group2, na.rm = TRUE)
+    median_diff <- median2 - median1
+    # Perform Wilcoxon rank-sum test (non-parametric alternative to t-test)
+    wilcox_test <- wilcox.test(group1, group2)
+    as_tibble(data.frame(
+        Metabolite = colnames(acr_0_1r_log2)[i],
+        Median_0_1R = median1,
+        Median_2R_plus = median2,
+        median_diff = median_diff,
+        p_value = wilcox_test$p.value
+        ))
+    })
+    ttest_res_median <- bind_rows(ttest_res_median)
+
+#+ Plot bar graphs with the median for significant metabolites based on Wilcoxon tests
+    sig_mets_median <- ttest_res_median %>%
+      filter(p_value < 0.1)
+    
+    # Display sample-level results summary
+    cat("Sample-level Wilcoxon test results:\n")
+    cat("Total metabolites tested:", nrow(ttest_res_median), "\n")
+    cat("Significant metabolites (p < 0.1):", nrow(sig_mets_median), "\n")
+    cat("Smallest p-value:", min(ttest_res_median$p_value, na.rm = TRUE), "\n")
+    
+    if (nrow(sig_mets_median) > 0) {
+        cat("Significant metabolites:\n")
+        print(sig_mets_median)
+    } else {
+        cat("No significant metabolites at sample level. Showing top 5 lowest p-values:\n")
+        print(ttest_res_median %>% arrange(p_value) %>% head(5))
+    }
+    
+    # Check if plot_ttest_bars function exists, if not skip plotting for now
+    if (exists("plot_ttest_bars") && nrow(sig_mets_median) > 0) {
+        ttest_bars_median <- plot_ttest_bars(sig_mets_median, acr_0_1r, acr_2r, use_median = TRUE)
+        
+        # Save plots to files
+        for (met in names(ttest_bars_median)) {
+            ggsave(
+                filename = paste0("./Immunosuppressive metabolites feature table/Results/Dump_122325/", met, "_Wilcoxon_plot_AT.png"),
+                plot = ttest_bars_median[[met]],
+                dpi = 300,
+                width = 8, height = 6
+            )
+        }
+        cat("Saved", length(ttest_bars_median), "Wilcoxon plots to Results folder.\n")
+    } else {
+        cat("Number of significant metabolites (Wilcoxon test):", nrow(sig_mets_median), "\n")
+        if (nrow(sig_mets_median) == 0) {
+            cat("No plots saved - no significant results at sample level.\n")
+        }
+    }
+
+
+#=== ANALYSIS 3: WILCOXON TESTS ON NON-LOG2 DATA ===
+
+#+ Perform Wilcoxon rank-sum tests on non-log2 data for comparison
+    wilcox_res_nonlog2 <- lapply(seq_along(acr_0_1r), function(i) {
+    group1 <- acr_0_1r[[i]]
+    group2 <- acr_2r[[i]]
+    median1 <- median(group1, na.rm = TRUE)
+    median2 <- median(group2, na.rm = TRUE)
+    median_diff <- median2 - median1
+    # Perform Wilcoxon rank-sum test on non-log2 data
+    wilcox_test <- wilcox.test(group1, group2)
+    as_tibble(data.frame(
+        Metabolite = colnames(acr_0_1r)[i],
+        Median_0_1R = median1,
+        Median_2R_plus = median2,
+        median_diff = median_diff,
+        p_value = wilcox_test$p.value
+        ))
+    })
+    wilcox_res_nonlog2 <- bind_rows(wilcox_res_nonlog2)
+
+    sig_mets_wilcox_nonlog2 <- wilcox_res_nonlog2 %>%
+      filter(p_value < 0.05)
+    
+    cat("Wilcoxon test results (non-log2 data):\n")
+    cat("Total metabolites tested:", nrow(wilcox_res_nonlog2), "\n")
+    cat("Significant metabolites (p < 0.05):", nrow(sig_mets_wilcox_nonlog2), "\n")
+    
+    if (nrow(sig_mets_wilcox_nonlog2) > 0) {
+        cat("Significant metabolites (Wilcoxon on non-log2):\n")
+        print(sig_mets_wilcox_nonlog2)
+        
+        # Create and save plots
+        if (exists("plot_ttest_bars")) {
+            wilcox_bars_nonlog2 <- plot_ttest_bars(sig_mets_wilcox_nonlog2, acr_0_1r, acr_2r, use_median = TRUE)
+            
+            # Save plots to files
+            for (met in names(wilcox_bars_nonlog2)) {
+                ggsave(
+                    filename = paste0("./Immunosuppressive metabolites feature table/Results/Dump_122325/", met, "_Wilcoxon_NonLog2_plot_AT.png"),
+                    plot = wilcox_bars_nonlog2[[met]],
+                    dpi = 300,
+                    width = 8, height = 6
+                )
+            }
+            cat("Saved", length(wilcox_bars_nonlog2), "Wilcoxon (non-log2) plots to Results folder.\n")
+        }
+    } else {
+        cat("No significant metabolites found with Wilcoxon tests on non-log2 data.\n")
+    }
+
+#=== ANALYSIS 4: PATIENT-LEVEL ANALYSIS ===
+#* Perform Wilcoxon rank-sum tests between ACR 0/1R and 2R+ at patient level
+    # Aggregate to patient level by taking median per patient
+    acr_0_1r_patient <- patients_with_2R %>%
+    filter(ACR %in% c("0R", "1R")) %>%
+    group_by(H) %>%
+    summarise(
+        across(where(is.numeric), \(x) median(x, na.rm = TRUE)),
+        .groups = "drop"
+    )
+
+    acr_2r_patient <- patients_with_2R %>%
+    filter(grepl("^2R", ACR, ignore.case = TRUE)) %>%
+    group_by(H) %>%
+    summarise(
+        across(where(is.numeric), \(x) median(x, na.rm = TRUE)),
+        .groups = "drop"
+    )
+
+    # Get common columns and exclude metadata columns (H, POD, S, etc.)
+    common_mets <- intersect(
+    colnames(acr_0_1r_patient),
+    colnames(acr_2r_patient)
+    )
+
+    # Exclude metadata columns - keep only actual metabolite columns
+    metadata_cols <- c("H", "POD", "S", "Sample_ID")
+    common_mets <- setdiff(common_mets, metadata_cols)
+    
+    # Display what metabolites will be tested
+    cat("Testing", length(common_mets), "metabolites at patient level:\n")
+    cat("First 10 metabolites:", head(common_mets, 10), "\n\n")
+
+    ttest_res_median_patient <- lapply(common_mets, function(met) {
+
+    group1 <- acr_0_1r_patient[[met]]
+    group2 <- acr_2r_patient[[met]]
+
+    # check samples group1 and group2 sizes
+    cat("Testing metabolite:", met, "\n")
+    cat("Group 1 (0R/1R) samples:", sum(!is.na(group1)), "\n")
+    cat("Group 2 (2R+) samples:", sum(!is.na(group2)), "\n")
+
+    wilcox_test <- wilcox.test(group1, group2)
+
+    tibble(
+        Metabolite = met,
+        Median_0_1R = median(group1, na.rm = TRUE),
+        Median_2R_plus = median(group2, na.rm = TRUE),
+        median_diff = median(group2, na.rm = TRUE) - median(group1, na.rm = TRUE),
+        p_value = wilcox_test$p.value
+    )
+    })
+
+    ttest_res_median_patient <- bind_rows(ttest_res_median_patient)
+
+    ttest_res_median_patient <- ttest_res_median_patient %>%
+    mutate(FDR = p.adjust(p_value, method = "BH"))
+
+#* Report significant metabolites at patient level based on Wilcoxon tests
+    sig_mets_median_patient <- ttest_res_median_patient %>%
+      filter(p_value < 0.05)
+    cat("Number of significant metabolites at patient level (Wilcoxon test):", nrow(sig_mets_median_patient), "\n")
+    print(sig_mets_median_patient)
+
+#* Report metabolites at patient level regardless of significance
+    cat("All metabolites tested at patient level:\n")
+    print(ttest_res_median_patient)
+
+
+#* OPTIONAL: Plot bar graphs with the median for significant metabolites at patient level
+    if (exists("plot_ttest_bars") && nrow(sig_mets_median_patient) > 0) {
+        ttest_bars_median_patient <- plot_ttest_bars(sig_mets_median_patient, acr_0_1r_patient %>% select(-H), acr_2r_patient %>% select(-H), use_median = TRUE)
+        
+        # Save patient-level plots to files
+        for (met in names(ttest_bars_median_patient)) {
+            ggsave(
+                filename = paste0("./Immunosuppressive metabolites feature table/Results/Dump_122325/", met, "_Patient_Level_Wilcoxon_plot_AT.png"),
+                plot = ttest_bars_median_patient[[met]],
+                dpi = 300,
+                width = 8, height = 6
+            )
+        }
+        cat("Saved", length(ttest_bars_median_patient), "patient-level Wilcoxon plots to Results folder.\n")
+    } else {
+        if (!exists("plot_ttest_bars")) {
+            cat("Warning: plot_ttest_bars function not found. Skipping patient-level median plots.\n")
+        } else {
+            cat("No significant metabolites found at patient level. No plots to save.\n")
+        }
+    }
+
+#=== SUMMARY TABLE: DESCRIPTIVE STATISTICS FOR ALL ANALYSES ===
+
+#+ Create comprehensive summary table comparing all 4 analyses (gtsummary format)
+    cat("\n=== COMPREHENSIVE SUMMARY TABLE ===\n")
+    
+    # Create a combined results dataframe for gtsummary
+    create_analysis_summary <- function() {
+        # Prepare data for each analysis
+        analysis1 <- ttest_res %>%
+            mutate(
+                Analysis_Type = "T-tests (Log2)",
+                Test_Statistic = "Mean difference (log2)",
+                Data_Transform = "Log2",
+                Level = "Sample"
+            )
+        
+        analysis2 <- ttest_res_median %>%
+            mutate(
+                Analysis_Type = "Wilcoxon (Log2)",
+                Test_Statistic = "Median difference", 
+                Data_Transform = "Log2",
+                Level = "Sample"
+            )
+        
+        analysis3 <- wilcox_res_nonlog2 %>%
+            mutate(
+                Analysis_Type = "Wilcoxon (Non-log2)",
+                Test_Statistic = "Median difference",
+                Data_Transform = "Non-log2", 
+                Level = "Sample"
+            )
+        
+        analysis4 <- ttest_res_median_patient %>%
+            mutate(
+                Analysis_Type = "Patient-level Wilcoxon",
+                Test_Statistic = "Median difference",
+                Data_Transform = "Non-log2",
+                Level = "Patient"
+            )
+        
+        # Combine all analyses
+        combined_results <- bind_rows(analysis1, analysis2, analysis3, analysis4) %>%
+            mutate(
+                Significant = ifelse(p_value < 0.05, "Yes", "No"),            Analysis_ID = case_when(
+                Analysis_Type == "T-tests (Log2)" ~ 1,
+                Analysis_Type == "Wilcoxon (Log2)" ~ 2,
+                Analysis_Type == "Wilcoxon (Non-log2)" ~ 3,
+                Analysis_Type == "Patient-level Wilcoxon" ~ 4
+            )
+            )
+        
+        return(combined_results)
+    }
+    
+    # Create summary table for each analysis method
+    summary_by_analysis <- function(data, analysis_name) {
+        n_total <- nrow(data)
+        n_sig <- sum(data$p_value < 0.05, na.rm = TRUE)
+        
+        tibble(
+            `Analysis Method` = analysis_name,
+            `Total Metabolites` = n_total,
+            `Significant (p<0.05)` = n_sig,
+            `% Significant` = round((n_sig/n_total) * 100, 1),
+            `P-values: Mean ± SD` = paste0(
+                round(mean(data$p_value, na.rm = TRUE), 3), " ± ", 
+                round(sd(data$p_value, na.rm = TRUE), 3)
+            ),
+            `P-values: Median [Q1, Q3]` = paste0(
+                round(median(data$p_value, na.rm = TRUE), 3), " [",
+                round(quantile(data$p_value, 0.25, na.rm = TRUE), 3), ", ",
+                round(quantile(data$p_value, 0.75, na.rm = TRUE), 3), "]"
+            ),
+            `Min P-value` = round(min(data$p_value, na.rm = TRUE), 4),
+            `Max P-value` = round(max(data$p_value, na.rm = TRUE), 4)
+        )
+    }
+    
+    # Generate summary for all analyses
+    final_summary <- bind_rows(
+        summary_by_analysis(ttest_res, "T-tests (Log2)"),
+        summary_by_analysis(ttest_res_median, "Wilcoxon (Log2)"),  
+        summary_by_analysis(wilcox_res_nonlog2, "Wilcoxon (Non-log2)"),
+        summary_by_analysis(ttest_res_median_patient, "Patient-level Wilcoxon")
+    )
+    
+    # Display formatted table
+    cat("\n**Table: Summary of Statistical Analysis Results**\n")
+    cat("================================================\n")
+    print(final_summary, width = Inf)
+    
+    # Show ALL results for each analysis (not just significant ones)
+    cat("\n\n**Detailed Results: ALL Metabolites for Each Analysis**\n")
+    cat("=====================================================\n")
+    
+    cat("\n--- Analysis 1: T-tests (Log2 data) ---\n")
+    print(ttest_res %>% arrange(p_value), width = Inf)
+    
+    cat("\n--- Analysis 2: Wilcoxon (Log2 data) ---\n") 
+    print(ttest_res_median %>% arrange(p_value), width = Inf)
+    
+    cat("\n--- Analysis 3: Wilcoxon (Non-log2 data) ---\n")
+    print(wilcox_res_nonlog2 %>% arrange(p_value), width = Inf)
+    
+    cat("\n--- Analysis 4: Patient-level Wilcoxon ---\n")
+    print(ttest_res_median_patient %>% arrange(p_value), width = Inf)
+    
+    # Additional summary for significant metabolites only
+    cat("\n\n**Summary of Significant Metabolites (p < 0.05)**\n")
+    cat("===============================================\n")
+    
+    sig_summary <- tibble(
+        `Analysis Method` = c("T-tests (Log2)", "Wilcoxon (Log2)", 
+                              "Wilcoxon (Non-log2)", "Patient-level Wilcoxon"),
+        `N Significant` = c(
+            nrow(filter(ttest_res, p_value < 0.05)),
+            nrow(filter(ttest_res_median, p_value < 0.05)),
+            nrow(filter(wilcox_res_nonlog2, p_value < 0.05)),
+            nrow(filter(ttest_res_median_patient, p_value < 0.05))
+        ),
+        `Significant Metabolites` = c(
+            ifelse(nrow(filter(ttest_res, p_value < 0.05)) > 0,
+                   paste(filter(ttest_res, p_value < 0.05)$Metabolite, collapse = ", "), "None"),
+            ifelse(nrow(filter(ttest_res_median, p_value < 0.05)) > 0,
+                   paste(filter(ttest_res_median, p_value < 0.05)$Metabolite, collapse = ", "), "None"),
+            ifelse(nrow(filter(wilcox_res_nonlog2, p_value < 0.05)) > 0,
+                   paste(filter(wilcox_res_nonlog2, p_value < 0.05)$Metabolite, collapse = ", "), "None"),
+            ifelse(nrow(filter(ttest_res_median_patient, p_value < 0.05)) > 0,
+                   paste(filter(ttest_res_median_patient, p_value < 0.05)$Metabolite, collapse = ", "), "None")
+        )
+    )
+    
+    print(sig_summary)
+    
+    cat("\n=== END SUMMARY ===\n")
+
+#=== TABLE 1: METABOLITE LEVELS BY ACR STATUS ===
+
+#+ Create publication-ready Table 1 showing metabolite levels by ACR group
+    cat("\n=== CREATING TABLE 1: METABOLITE LEVELS BY ACR STATUS ===\n")
+    
+    # Check if required packages are available for gtsummary
+    if (!requireNamespace("gtsummary", quietly = TRUE)) {
+        cat("Installing gtsummary package...\n")
+        install.packages("gtsummary")
+    }
+    library(gtsummary)
+    library(flextable)
+    
+    # Prepare data for Table 1 - combine ACR groups with metabolite data
+    table1_data <- patients_with_2R %>%
+        mutate(
+            # Create binary ACR grouping for Table 1
+            ACR_Status = case_when(
+                ACR %in% c("0R", "1R") ~ "0R/1R", 
+                grepl("^2R", ACR, ignore.case = TRUE) ~ "2R+",
+                TRUE ~ "Other"
+            )
+        ) %>%
+        filter(ACR_Status %in% c("0R/1R", "2R+")) %>%  # Only include main comparison groups
+        select(-H, -S, -POD, -Sample_ID, -ACR) %>%  # Remove metadata columns
+        mutate(ACR_Status = factor(ACR_Status, levels = c("0R/1R", "2R+")))
+    
+    # Get list of metabolite columns (all numeric columns except ACR_Status)
+    metabolite_cols <- names(select_if(table1_data, is.numeric))
+    
+    cat("Creating Table 1 with", length(metabolite_cols), "metabolites\n")
+    cat("Sample sizes: 0R/1R =", sum(table1_data$ACR_Status == "0R/1R"), 
+        ", 2R+ =", sum(table1_data$ACR_Status == "2R+"), "\n")
+    
+    # Create the gtsummary Table 1
+    metabolite_table1 <- table1_data %>%
+        gtsummary::tbl_summary(
+            by = ACR_Status,
+            include = all_of(metabolite_cols),
+            type = list(all_of(metabolite_cols) ~ "continuous"),
+            statistic = list(
+                all_continuous() ~ "{mean} ({sd}); {median} [{p25}, {p75}]"
+            ),
+            missing = "no",
+            digits = list(
+                all_continuous() ~ 2  # 2 decimal places for metabolite values
+            ),
+            label = list(
+                # Add custom labels for metabolites if needed
+                # Example: "metabolite_name" ~ "Metabolite Display Name"
+            )
+        ) %>%
+        gtsummary::add_p(
+            test = list(
+                all_continuous() ~ "wilcox.test"  # Use Wilcoxon test for non-normal metabolite data
+            ),
+            pvalue_fun = ~ gtsummary::style_pvalue(.x, digits = 3)
+        ) %>%
+        gtsummary::modify_spanning_header(c("stat_1", "stat_2") ~ "**ACR Status**") %>%
+        gtsummary::modify_caption("**Table 1: Metabolite Levels by ACR Status**") %>%
+        gtsummary::modify_footnote(
+            all_stat_cols() ~ "Statistics presented: Mean (SD); Median [Q1, Q3]"
+        )
+    
+    # Display the table
+    cat("\nTable 1 - Metabolite Levels by ACR Status:\n")
+    print(metabolite_table1)
+    
+    # Export Table 1 to Word document
+    cat("\nExporting Table 1 to Word document...\n")
+    
+    tryCatch({
+        # Create flextable version
+        flex_table1_metabolites <- metabolite_table1 %>%
+            gtsummary::as_flex_table() %>%
+            flextable::set_caption("Table 1: Metabolite Levels by ACR Status") %>%
+            flextable::autofit()
+        
+        # Export to Word
+        output_path_table1 <- "./Immunosuppressive metabolites feature table/Results/Dump_122325/Table1_Metabolite_Levels_By_ACR_Status.docx"
+
+        flex_table1_metabolites %>%
+            flextable::save_as_docx(path = output_path_table1)
+        
+        cat("Successfully exported Table 1 to:", output_path_table1, "\n")
+        
+        # Also save the raw data for Table 1 as CSV
+        table1_summary_data <- table1_data %>%
+            group_by(ACR_Status) %>%
+            summarise(
+                across(all_of(metabolite_cols), 
+                       list(
+                           mean = ~ mean(.x, na.rm = TRUE),
+                           sd = ~ sd(.x, na.rm = TRUE), 
+                           median = ~ median(.x, na.rm = TRUE),
+                           q25 = ~ quantile(.x, 0.25, na.rm = TRUE),
+                           q75 = ~ quantile(.x, 0.75, na.rm = TRUE),
+                           n = ~ sum(!is.na(.x))
+                       ),
+                       .names = "{.col}_{.fn}"),
+                .groups = "drop"
+            )
+        
+        write.csv(table1_summary_data, 
+                  "./Immunosuppressive metabolites feature table/Results/Dump_122325/Table1_Metabolite_Summary_Data.csv", 
+                  row.names = FALSE)
+        
+        cat("Table 1 summary data saved as CSV.\n")
+        
+    }, error = function(e) {
+        cat("Error creating Table 1 Word document:", e$message, "\n")
+        cat("Saving Table 1 data as CSV instead...\n")
+        
+        # Save raw data if Word export fails
+        write.csv(table1_data, 
+                  "./Immunosuppressive metabolites feature table/Results/Dump_122325/Table1_Raw_Data.csv", 
+                  row.names = FALSE)
+        cat("Table 1 raw data saved as CSV.\n")
+    })
+    
+    cat("\n=== TABLE 1 CREATION COMPLETE ===\n")
+
+#=== CREATE CLINICAL FORMAT TABLES FOR ALL ANALYSES ===
+
+#+ Create clinical format tables (like Table 1 style) for all analyses
+    cat("\n=== CREATING CLINICAL FORMAT TABLES FOR ALL ANALYSES ===\n")
+    
+    # Check if required packages are available
+    if (!requireNamespace("officer", quietly = TRUE)) {
+        cat("Installing officer package...\n")
+        install.packages("officer")
+    }
+    library(officer)
+    
+    # Format T-test Results in Clinical Style (convert log2 back to original scale for display)
+    ttest_clinical <- ttest_res %>%
+        arrange(p_value) %>%
+        mutate(
+            # Convert log2 means back to original scale for clinical interpretation
+            Mean_0_1R_original = 2^Mean_0_1R_log2,
+            Mean_2R_plus_original = 2^Mean_2R_plus_log2,
+            # Calculate fold change from log2 difference
+            Fold_Change = 2^mean_diff_log2,
+            `0R/1R Group` = paste0(round(Mean_0_1R_original, 1), " (", round(sqrt(var(Mean_0_1R_original, na.rm = TRUE)), 1), ")"),
+            `2R+ Group` = paste0(round(Mean_2R_plus_original, 1), " (", round(sqrt(var(Mean_2R_plus_original, na.rm = TRUE)), 1), ")"),
+            `Fold Change (2R+/0R-1R)` = round(Fold_Change, 2),
+            `p-value` = round(p_value, 3)
+        ) %>%
+        select(Metabolite, `0R/1R Group`, `2R+ Group`, `Fold Change (2R+/0R-1R)`, `p-value`)
+    
+    # Format Wilcoxon (Log2) Results in Clinical Style  
+    wilcox_log2_clinical <- ttest_res_median %>%
+        arrange(p_value) %>%
+        mutate(
+            `0R/1R Group` = paste0(round(2^Median_0_1R, 1), " [", 
+                                  round(2^quantile(Median_0_1R, 0.25, na.rm = TRUE), 1), ", ",
+                                  round(2^quantile(Median_0_1R, 0.75, na.rm = TRUE), 1), "]"),
+            `2R+ Group` = paste0(round(2^Median_2R_plus, 1), " [", 
+                                round(2^quantile(Median_2R_plus, 0.25, na.rm = TRUE), 1), ", ",
+                                round(2^quantile(Median_2R_plus, 0.75, na.rm = TRUE), 1), "]"),
+            `p-value` = round(p_value, 3)
+        ) %>%
+        select(Metabolite, `0R/1R Group`, `2R+ Group`, `p-value`)
+    
+    # Format Wilcoxon (Non-log2) Results in Clinical Style
+    wilcox_nonlog2_clinical <- wilcox_res_nonlog2 %>%
+        arrange(p_value) %>%
+        mutate(
+            `0R/1R Group` = paste0(round(Median_0_1R, 1), " [", 
+                                  round(quantile(Median_0_1R, 0.25, na.rm = TRUE), 1), ", ",
+                                  round(quantile(Median_0_1R, 0.75, na.rm = TRUE), 1), "]"),
+            `2R+ Group` = paste0(round(Median_2R_plus, 1), " [", 
+                                round(quantile(Median_2R_plus, 0.25, na.rm = TRUE), 1), ", ",
+                                round(quantile(Median_2R_plus, 0.75, na.rm = TRUE), 1), "]"),
+            `p-value` = round(p_value, 3)
+        ) %>%
+        select(Metabolite, `0R/1R Group`, `2R+ Group`, `p-value`)
+    
+    # Format Patient-level Results in Clinical Style
+    patient_clinical <- ttest_res_median_patient %>%
+        arrange(p_value) %>%
+        mutate(
+            `0R/1R Patients` = paste0(round(Median_0_1R, 1), " [", 
+                                     round(quantile(Median_0_1R, 0.25, na.rm = TRUE), 1), ", ",
+                                     round(quantile(Median_0_1R, 0.75, na.rm = TRUE), 1), "]"),
+            `2R+ Patients` = paste0(round(Median_2R_plus, 1), " [", 
+                                   round(quantile(Median_2R_plus, 0.25, na.rm = TRUE), 1), ", ",
+                                   round(quantile(Median_2R_plus, 0.75, na.rm = TRUE), 1), "]"),
+            `p-value` = round(p_value, 3),
+            `FDR` = round(FDR, 3)
+        ) %>%
+        select(Metabolite, `0R/1R Patients`, `2R+ Patients`, `p-value`, `FDR`)
+    
+    # Create flextables for all clinical format tables
+    clinical_ttest_table <- ttest_clinical %>%
+        flextable::flextable() %>%
+        flextable::set_caption("Clinical Table 2: T-test Results (Log2 Analysis) - Mean (SD) Metabolite Levels by ACR Status") %>%
+        flextable::theme_vanilla() %>%
+        flextable::autofit() %>%
+        flextable::bold(part = "header")
+    
+    clinical_wilcox_log2_table <- wilcox_log2_clinical %>%
+        flextable::flextable() %>%
+        flextable::set_caption("Clinical Table 3: Wilcoxon Results (Log2 Data) - Median [Q1, Q3] by ACR Status") %>%
+        flextable::theme_vanilla() %>%
+        flextable::autofit() %>%
+        flextable::bold(part = "header")
+    
+    clinical_wilcox_nonlog2_table <- wilcox_nonlog2_clinical %>%
+        flextable::flextable() %>%
+        flextable::set_caption("Clinical Table 4: Wilcoxon Results (Non-log2 Data) - Median [Q1, Q3] by ACR Status") %>%
+        flextable::theme_vanilla() %>%
+        flextable::autofit() %>%
+        flextable::bold(part = "header")
+    
+    clinical_patient_table <- patient_clinical %>%
+        flextable::flextable() %>%
+        flextable::set_caption("Clinical Table 5: Patient-level Analysis - Median [Q1, Q3] by ACR Status") %>%
+        flextable::theme_vanilla() %>%
+        flextable::autofit() %>%
+        flextable::bold(part = "header")
+    
+    # Export clinical format tables to Word
+    clinical_output_path <- "./Immunosuppressive metabolites feature table/Results/Dump_122325/Metabolomics_Clinical_Format_All_Tables.docx"
+
+    tryCatch({
+        # Create comprehensive clinical format document
+        doc <- officer::read_docx()
+        doc <- flextable::body_add_flextable(doc, clinical_ttest_table)
+        doc <- officer::body_add_break(doc)
+        doc <- flextable::body_add_flextable(doc, clinical_wilcox_log2_table)
+        doc <- officer::body_add_break(doc)
+        doc <- flextable::body_add_flextable(doc, clinical_wilcox_nonlog2_table)
+        doc <- officer::body_add_break(doc)
+        doc <- flextable::body_add_flextable(doc, clinical_patient_table)
+        
+        print(doc, target = clinical_output_path)
+        cat("Successfully exported all clinical format tables to:", clinical_output_path, "\n")
+        
+        # Also save individual clinical tables
+        clinical_ttest_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_TTest_Results.docx")
+        clinical_wilcox_log2_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_Wilcoxon_Log2_Results.docx")
+        clinical_wilcox_nonlog2_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_Wilcoxon_NonLog2_Results.docx")
+        clinical_patient_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_Patient_Level_Results.docx")
+
+        cat("Individual clinical format tables also saved.\n")
+        
+    }, error = function(e) {
+        cat("Error creating clinical format Word documents:", e$message, "\n")
+        
+        # Save as CSV if Word export fails
+        write.csv(ttest_clinical, "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_TTest_Results.csv", row.names = FALSE)
+        write.csv(wilcox_log2_clinical, "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_Wilcoxon_Log2_Results.csv", row.names = FALSE)
+        write.csv(wilcox_nonlog2_clinical, "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_Wilcoxon_NonLog2_Results.csv", row.names = FALSE)
+        write.csv(patient_clinical, "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_Patient_Level_Results.csv", row.names = FALSE)
+
+        cat("Clinical format tables saved as CSV files.\n")
+    })
+    
+    cat("\n=== CLINICAL FORMAT CREATION COMPLETE ===\n")
+
+    cat("\n=== ALL ANALYSES COMPLETE ===\n")
+    cat("Check the Results folder for:\n")
+    cat("1. Table1_Metabolite_Levels_By_ACR_Status.docx - Main clinical table\n")
+    cat("2. Metabolomics_Clinical_Format_All_Tables.docx - All analyses in clinical format\n")
+    cat("3. Individual analysis files and CSV backups\n")
+    cat("4. Plot files for significant metabolites\n")
+
+# Display all tables in the console for review
+    cat("\nDisplaying all generated tables in the console for review:\n")
+    print(final_summary, width = Inf)
+    print(metabolite_table1)
+    print(clinical_ttest_table)
+    print(clinical_wilcox_log2_table)
+    print(clinical_wilcox_nonlog2_table)
+    print(clinical_patient_table)
+
+#! For analyses on log2 scale, data is reported on original scale in clinical tables for interpretability.
