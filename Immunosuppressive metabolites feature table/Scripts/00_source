@@ -22,7 +22,8 @@ suppressMessages(suppressWarnings(local({
   invisible(capture.output({
     source("Immunosuppressive metabolites feature table/Scripts/01_libraries")
     source("Immunosuppressive metabolites feature table/Scripts/02_setup")
-    source("Immunosuppressive metabolites feature table/Scripts/03_plotting_functions")
+    source("Immunosuppressive metabolites feature table/Scripts/03a_plotting_functions")
+    source("Immunosuppressive metabolites feature table/Scripts/03b_tests_plots")
     source("Immunosuppressive metabolites feature table/Scripts/03_tests")
     source("Immunosuppressive metabolites feature table/Scripts/04_PODdist")
   }))
