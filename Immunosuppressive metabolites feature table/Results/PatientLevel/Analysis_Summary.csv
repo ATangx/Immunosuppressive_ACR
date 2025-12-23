@@ -1,0 +1,4 @@
+Analysis,Total_Metabolites,Significant_p005,Significant_FDR005,Patients_No_2R,Patients_Has_2R
+T-test (Non-log2),15,1,1,39,18
+Wilcoxon (Log2),15,0,0,39,18
+Wilcoxon (Non-log2),15,0,0,39,18

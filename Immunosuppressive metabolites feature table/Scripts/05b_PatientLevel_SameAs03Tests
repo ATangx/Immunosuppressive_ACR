@@ -1,0 +1,180 @@
+#=== PATIENT-LEVEL ANALYSIS: MATCHING EXACTLY THE LOGIC FROM 03_TESTS ===
+
+cat("\n=== PATIENT-LEVEL METABOLITE ANALYSIS (MATCHING 03_TESTS LOGIC) ===\n")
+cat("Performing patient-level analysis ONLY on patients with at least one 2R+ episode\n")
+cat("This matches the exact logic from the patient-level section in 03_tests\n")
+cat("Comparing 0R/1R samples vs 2R+ samples within patients who experienced rejection\n\n")
+
+# Source all required data and plotting functions
+source("Immunosuppressive metabolites feature table/Scripts/00_source")
+
+#=== PATIENT-LEVEL DATA PREPARATION (MATCHING 03_TESTS) ===
+
+cat("=== PATIENT-LEVEL DATA PREPARATION (MATCHING 03_TESTS) ===\n")
+
+# Use the same logic as 03_tests: aggregate to patient level by taking median per patient
+# BUT only from patients who had at least one 2R+ episode (patients_with_2R)
+cat("Aggregating data to patient level using median values...\n")
+cat("Using only patients with at least one 2R+ episode (same as 03_tests)...\n")
+
+# Replicate the exact logic from 03_tests lines 219-235
+acr_0_1r_patient <- patients_with_2R %>%
+  filter(ACR %in% c("0R", "1R")) %>%
+  group_by(H) %>%
+  summarise(
+    across(where(is.numeric), \(x) median(x, na.rm = TRUE)),
+    .groups = "drop"
+  )
+
+acr_2r_patient <- patients_with_2R %>%
+  filter(grepl("^2R", ACR, ignore.case = TRUE)) %>%
+  group_by(H) %>%
+  summarise(
+    across(where(is.numeric), \(x) median(x, na.rm = TRUE)),
+    .groups = "drop"
+  )
+
+# Get common columns and exclude metadata columns (H, POD, S, etc.)
+common_mets <- intersect(
+  colnames(acr_0_1r_patient),
+  colnames(acr_2r_patient)
+)
+
+# Exclude metadata columns - keep only actual metabolite columns
+metadata_cols <- c("H", "POD", "S", "Sample_ID")
+common_mets <- setdiff(common_mets, metadata_cols)
+
+cat("Patient-level aggregation complete (03_tests logic):\n")
+cat("Total patients with 0R/1R samples:", nrow(acr_0_1r_patient), "\n")
+cat("Total patients with 2R+ samples:", nrow(acr_2r_patient), "\n")
+cat("Total metabolites to test:", length(common_mets), "\n")
+
+# Check for sufficient sample sizes
+if(nrow(acr_0_1r_patient) < 3 | nrow(acr_2r_patient) < 3) {
+  stop("Insufficient patients per group for analysis (need ≥3 each)")
+}
+
+#=== PATIENT-LEVEL STATISTICAL ANALYSIS (MATCHING 03_TESTS) ===
+
+cat("\n=== PATIENT-LEVEL STATISTICAL ANALYSIS (MATCHING 03_TESTS) ===\n")
+
+# Replicate the exact Wilcoxon test logic from 03_tests lines 249-275
+ttest_res_median_patient <- lapply(common_mets, function(met) {
+  
+  group1 <- acr_0_1r_patient[[met]]
+  group2 <- acr_2r_patient[[met]]
+  
+  # Check samples group1 and group2 sizes
+  cat("Testing metabolite:", met, "\n")
+  cat("Group 1 (0R/1R) samples:", sum(!is.na(group1)), "\n")
+  cat("Group 2 (2R+) samples:", sum(!is.na(group2)), "\n")
+  
+  wilcox_test <- wilcox.test(group1, group2)
+  
+  tibble(
+    Metabolite = met,
+    Median_0_1R = median(group1, na.rm = TRUE),
+    Median_2R_plus = median(group2, na.rm = TRUE),
+    median_diff = median(group2, na.rm = TRUE) - median(group1, na.rm = TRUE),
+    p_value = wilcox_test$p.value
+  )
+})
+
+ttest_res_median_patient <- bind_rows(ttest_res_median_patient)
+
+ttest_res_median_patient <- ttest_res_median_patient %>%
+  mutate(FDR = p.adjust(p_value, method = "BH"))
+
+# Report significant metabolites at patient level based on Wilcoxon tests
+sig_mets_median_patient <- ttest_res_median_patient %>%
+  filter(p_value < 0.05)
+
+cat("Patient-level Wilcoxon test results (matching 03_tests):\n")
+cat("Total metabolites tested:", nrow(ttest_res_median_patient), "\n")
+cat("Significant metabolites (p < 0.05):", nrow(sig_mets_median_patient), "\n")
+cat("Significant metabolites (FDR < 0.05):", sum(ttest_res_median_patient$FDR < 0.05, na.rm = TRUE), "\n")
+
+if(nrow(sig_mets_median_patient) > 0) {
+  cat("Significant metabolites:\n")
+  print(sig_mets_median_patient)
+} else {
+  cat("No significant metabolites found. Showing top 5 lowest p-values:\n")
+  print(ttest_res_median_patient %>% arrange(p_value) %>% head(5))
+}
+
+cat("All metabolites tested at patient level:\n")
+print(ttest_res_median_patient)
+
+#=== CREATE PLOTS FOR RESULTS ===
+
+cat("\n=== CREATING PLOTS FOR PATIENT-LEVEL RESULTS (03_TESTS LOGIC) ===\n")
+
+# Create output directory
+output_dir <- "./Immunosuppressive metabolites feature table/Results/PatientLevel_5b/"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+
+plot_count <- 0
+
+# Create plots for significant results (use p < 0.1 threshold for more plots)
+sig_for_plots <- ttest_res_median_patient %>% filter(p_value < 0.1)
+
+if(nrow(sig_for_plots) > 0) {
+  cat("Creating patient-level plots for", nrow(sig_for_plots), "metabolites with p < 0.1...\n")
+  
+  # Use enhanced plotting function if available
+  if(exists("plot_enhanced_bars")) {
+    patient_plots <- plot_enhanced_bars(sig_for_plots, 
+                                       acr_0_1r_patient %>% select(-H), 
+                                       acr_2r_patient %>% select(-H), 
+                                       use_median = TRUE,
+                                       analysis_level = "Patient-Level (03_tests logic)",
+                                       test_type = "Wilcoxon")
+    
+    # Save plots with descriptive names
+    for (met in names(patient_plots)) {
+      filename <- paste0(output_dir, met, "_03TestsLogic_PatientLevel_Wilcoxon_plot.png")
+      ggsave(filename, plot = patient_plots[[met]], dpi = 300, width = 10, height = 7)
+      plot_count <- plot_count + 1
+    }
+  }
+} else {
+  cat("No metabolites with p < 0.1 found. No plots to create.\n")
+}
+
+cat("Created", plot_count, "patient-level plots using 03_tests logic.\n")
+
+#=== EXPORT RESULTS ===
+
+cat("\n=== EXPORTING PATIENT-LEVEL RESULTS (03_TESTS LOGIC) ===\n")
+
+# Export results
+write_csv(ttest_res_median_patient, paste0(output_dir, "03TestsLogic_PatientLevel_Results.csv"))
+write_csv(sig_mets_median_patient, paste0(output_dir, "03TestsLogic_PatientLevel_Significant.csv"))
+
+# Export patient aggregated data for reference
+write_csv(acr_0_1r_patient, paste0(output_dir, "03TestsLogic_0R1R_PatientData.csv"))
+write_csv(acr_2r_patient, paste0(output_dir, "03TestsLogic_2R_PatientData.csv"))
+
+cat("Exported patient-level results using 03_tests logic\n")
+
+#=== SUMMARY COMPARISON ===
+
+cat("\n=== SUMMARY: COMPARISON OF TWO PATIENT-LEVEL APPROACHES ===\n")
+cat("1. 03_TESTS LOGIC (this script):\n")
+cat("   - Only patients with ≥1 2R+ episode included\n")
+cat("   - Compares 0R/1R vs 2R+ SAMPLES within those patients\n")
+cat("   - Question: Among patients who rejected, do metabolite levels differ by rejection grade?\n")
+cat("   - Patients with 0R/1R samples:", nrow(acr_0_1r_patient), "\n")
+cat("   - Patients with 2R+ samples:", nrow(acr_2r_patient), "\n")
+cat("   - Significant metabolites:", nrow(sig_mets_median_patient), "\n\n")
+
+cat("2. 05A_PATIENTLEVEL LOGIC:\n")
+cat("   - ALL patients included\n") 
+cat("   - Compares patients who NEVER had 2R+ vs patients who HAD ≥1 2R+ episode\n")
+cat("   - Question: Do baseline metabolite profiles predict rejection risk?\n")
+cat("   - This is the more clinically relevant comparison for biomarker discovery\n\n")
+
+cat("Both analyses are valid but answer different clinical questions!\n")
+cat("\n=== PATIENT-LEVEL ANALYSIS (03_TESTS LOGIC) COMPLETE ===\n")

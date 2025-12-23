@@ -1,0 +1,458 @@
+# Source the main analysis script first
+source("Immunosuppressive metabolites feature table/Scripts/02_AT_tests")
+
+#=== ANALYSIS 5: MATCHED PATIENT ANALYSIS (ONE SAMPLE PER PATIENT) ===
+
+cat("\n=== ANALYSIS 5: MATCHED PATIENT ANALYSIS ===\n")
+cat("Purpose: One sample per patient for proper statistical independence\n\n")
+
+# Check patient distribution first
+cat("--- Current Data Structure ---\n")
+patient_sample_counts <- nonlog2_data %>%
+    count(H, sort = TRUE)
+cat("Patients with multiple samples:", sum(patient_sample_counts$n > 1), "\n")
+cat("Total samples:", sum(patient_sample_counts$n), "\n")
+cat("Median samples per patient:", median(patient_sample_counts$n), "\n\n")
+
+# POD distribution
+cat("POD distribution across all samples:\n")
+print(summary(nonlog2_data$POD))
+cat("\n")
+
+# POD distribution groups (0-30, 31-90, 91+ days)
+nonlog2_data <- nonlog2_data %>%
+    mutate(POD_Group = case_when(
+        POD <= 30 ~ "0-30 days",
+        POD <= 90 ~ "31-90 days",
+        TRUE ~ "91+ days"
+    ))
+cat("POD Group distribution:\n")
+print(table(nonlog2_data$POD_Group))
+
+# For each patient, view their POD and ACR status
+cat("\nSample POD and ACR status per patient:\n")
+patient_acr_pod <- nonlog2_data %>%
+    select(H, POD, ACR) %>%
+    arrange(H, POD)
+print(head(patient_acr_pod, 20))  # Show first 20 entries for brevity
+cat("\n")
+
+
+
+#+ Option 1: Random sample per patient (most unbiased)
+cat("Option 1: Random sample per patient\n")
+set.seed(123)  # For reproducibility
+matched_random <- nonlog2_data %>%
+    group_by(H) %>%
+    slice_sample(n = 1) %>%  # Random sample per patient
+    ungroup() %>%
+    mutate(
+        ACR_Status = case_when(
+            ACR %in% c("0R", "1R") ~ "0R/1R", 
+            grepl("^2R", ACR, ignore.case = TRUE) ~ "2R+",
+            TRUE ~ "Other"
+        )
+    ) %>%
+    filter(ACR_Status %in% c("0R/1R", "2R+")) %>%
+    mutate(ACR_Status = factor(ACR_Status, levels = c("0R/1R", "2R+")))
+
+cat("Sample sizes after random matching: 0R/1R =", sum(matched_random$ACR_Status == "0R/1R"), 
+    ", 2R+ =", sum(matched_random$ACR_Status == "2R+"), "\n")
+
+# Prepare data for analysis (remove metadata columns)
+matched_random_clean <- matched_random %>%
+    select(-H, -S, -POD, -Sample_ID, -ACR, -ACR_Status)
+
+acr_0_1r_matched_random <- matched_random %>%
+    filter(ACR_Status == "0R/1R") %>%
+    select(where(is.numeric))
+
+acr_2r_matched_random <- matched_random %>%
+    filter(ACR_Status == "2R+") %>%
+    select(where(is.numeric))
+
+#+ Option 2: Median timepoint per patient (most representative)
+cat("\nOption 2: Median timepoint per patient\n")
+matched_median <- nonlog2_data %>%
+    group_by(H) %>%
+    arrange(POD) %>%
+    slice(ceiling(n()/2)) %>%  # Middle timepoint
+    ungroup() %>%
+    mutate(
+        ACR_Status = case_when(
+            ACR %in% c("0R", "1R") ~ "0R/1R", 
+            grepl("^2R", ACR, ignore.case = TRUE) ~ "2R+",
+            TRUE ~ "Other"
+        )
+    ) %>%
+    filter(ACR_Status %in% c("0R/1R", "2R+")) %>%
+    mutate(ACR_Status = factor(ACR_Status, levels = c("0R/1R", "2R+")))
+
+cat("Sample sizes after median timepoint matching: 0R/1R =", sum(matched_median$ACR_Status == "0R/1R"), 
+    ", 2R+ =", sum(matched_median$ACR_Status == "2R+"), "\n")
+
+acr_0_1r_matched_median <- matched_median %>%
+    filter(ACR_Status == "0R/1R") %>%
+    select(where(is.numeric))
+
+acr_2r_matched_median <- matched_median %>%
+    filter(ACR_Status == "2R+") %>%
+    select(where(is.numeric))
+
+#+ Option 3: Specific timepoint (POD ~30 days)
+cat("\nOption 3: Closest to POD 30 days\n")
+matched_pod30 <- nonlog2_data %>%
+    group_by(H) %>%
+    mutate(pod_diff = abs(POD - 30)) %>%
+    slice_min(pod_diff, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    mutate(
+        ACR_Status = case_when(
+            ACR %in% c("0R", "1R") ~ "0R/1R", 
+            grepl("^2R", ACR, ignore.case = TRUE) ~ "2R+",
+            TRUE ~ "Other"
+        )
+    ) %>%
+    filter(ACR_Status %in% c("0R/1R", "2R+")) %>%
+    mutate(ACR_Status = factor(ACR_Status, levels = c("0R/1R", "2R+")))
+
+cat("Sample sizes after POD 30 matching: 0R/1R =", sum(matched_pod30$ACR_Status == "0R/1R"), 
+    ", 2R+ =", sum(matched_pod30$ACR_Status == "2R+"), "\n")
+
+acr_0_1r_matched_pod30 <- matched_pod30 %>%
+    filter(ACR_Status == "0R/1R") %>%
+    select(where(is.numeric))
+
+acr_2r_matched_pod30 <- matched_pod30 %>%
+    filter(ACR_Status == "2R+") %>%
+    select(where(is.numeric))
+
+#=== STATISTICAL ANALYSIS FOR MATCHED DATA ===
+
+#+ Analysis 5A: Random matching - Wilcoxon tests
+cat("\n--- Analysis 5A: Random Matching Wilcoxon Tests ---\n")
+matched_random_results <- lapply(seq_along(acr_0_1r_matched_random), function(i) {
+    group1 <- acr_0_1r_matched_random[[i]]
+    group2 <- acr_2r_matched_random[[i]]
+    
+    if(length(group1) > 5 & length(group2) > 5) {  # Minimum sample size check
+        wilcox_test <- wilcox.test(group1, group2)
+        
+        tibble(
+            Metabolite = colnames(acr_0_1r_matched_random)[i],
+            Median_0_1R = median(group1, na.rm = TRUE),
+            Median_2R_plus = median(group2, na.rm = TRUE),
+            median_diff = median(group2, na.rm = TRUE) - median(group1, na.rm = TRUE),
+            p_value = wilcox_test$p.value,
+            n_0_1R = length(group1),
+            n_2R = length(group2)
+        )
+    } else {
+        NULL
+    }
+})
+
+matched_random_results <- bind_rows(matched_random_results[!sapply(matched_random_results, is.null)])
+matched_random_results <- matched_random_results %>%
+    mutate(FDR = p.adjust(p_value, method = "BH"))
+
+#+ Analysis 5B: Median timepoint matching - Wilcoxon tests
+cat("\n--- Analysis 5B: Median Timepoint Matching Wilcoxon Tests ---\n")
+matched_median_results <- lapply(seq_along(acr_0_1r_matched_median), function(i) {
+    group1 <- acr_0_1r_matched_median[[i]]
+    group2 <- acr_2r_matched_median[[i]]
+    
+    if(length(group1) > 5 & length(group2) > 5) {
+        wilcox_test <- wilcox.test(group1, group2)
+        
+        tibble(
+            Metabolite = colnames(acr_0_1r_matched_median)[i],
+            Median_0_1R = median(group1, na.rm = TRUE),
+            Median_2R_plus = median(group2, na.rm = TRUE),
+            median_diff = median(group2, na.rm = TRUE) - median(group1, na.rm = TRUE),
+            p_value = wilcox_test$p.value,
+            n_0_1R = length(group1),
+            n_2R = length(group2)
+        )
+    } else {
+        NULL
+    }
+})
+
+matched_median_results <- bind_rows(matched_median_results[!sapply(matched_median_results, is.null)])
+matched_median_results <- matched_median_results %>%
+    mutate(FDR = p.adjust(p_value, method = "BH"))
+
+#+ Analysis 5C: POD 30 matching - Wilcoxon tests
+cat("\n--- Analysis 5C: POD 30 Matching Wilcoxon Tests ---\n")
+matched_pod30_results <- lapply(seq_along(acr_0_1r_matched_pod30), function(i) {
+    group1 <- acr_0_1r_matched_pod30[[i]]
+    group2 <- acr_2r_matched_pod30[[i]]
+    
+    if(length(group1) > 5 & length(group2) > 5) {
+        wilcox_test <- wilcox.test(group1, group2)
+        
+        tibble(
+            Metabolite = colnames(acr_0_1r_matched_pod30)[i],
+            Median_0_1R = median(group1, na.rm = TRUE),
+            Median_2R_plus = median(group2, na.rm = TRUE),
+            median_diff = median(group2, na.rm = TRUE) - median(group1, na.rm = TRUE),
+            p_value = wilcox_test$p.value,
+            n_0_1R = length(group1),
+            n_2R = length(group2)
+        )
+    } else {
+        NULL
+    }
+})
+
+matched_pod30_results <- bind_rows(matched_pod30_results[!sapply(matched_pod30_results, is.null)])
+matched_pod30_results <- matched_pod30_results %>%
+    mutate(FDR = p.adjust(p_value, method = "BH"))
+
+#=== SUMMARY OF MATCHED ANALYSES ===
+
+cat("\n=== SUMMARY OF MATCHED PATIENT ANALYSES ===\n")
+
+# Create summary table
+matched_summary <- tibble(
+    `Analysis Method` = c("5A: Random Matching", "5B: Median Timepoint", "5C: POD 30 Matching"),
+    `Total Metabolites` = c(nrow(matched_random_results), nrow(matched_median_results), nrow(matched_pod30_results)),
+    `Significant (p<0.05)` = c(
+        sum(matched_random_results$p_value < 0.05, na.rm = TRUE),
+        sum(matched_median_results$p_value < 0.05, na.rm = TRUE),
+        sum(matched_pod30_results$p_value < 0.05, na.rm = TRUE)
+    ),
+    `% Significant` = round(c(
+        (sum(matched_random_results$p_value < 0.05, na.rm = TRUE) / nrow(matched_random_results)) * 100,
+        (sum(matched_median_results$p_value < 0.05, na.rm = TRUE) / nrow(matched_median_results)) * 100,
+        (sum(matched_pod30_results$p_value < 0.05, na.rm = TRUE) / nrow(matched_pod30_results)) * 100
+    ), 1),
+    `Min P-value` = c(
+        round(min(matched_random_results$p_value, na.rm = TRUE), 4),
+        round(min(matched_median_results$p_value, na.rm = TRUE), 4),
+        round(min(matched_pod30_results$p_value, na.rm = TRUE), 4)
+    )
+)
+
+print(matched_summary)
+
+# Show significant metabolites for each matching strategy
+cat("\n--- Significant Metabolites by Matching Strategy ---\n")
+sig_random <- filter(matched_random_results, p_value < 0.05)
+sig_median <- filter(matched_median_results, p_value < 0.05)
+sig_pod30 <- filter(matched_pod30_results, p_value < 0.05)
+
+if(nrow(sig_random) > 0) {
+    cat("Random Matching - Significant metabolites:\n")
+    print(sig_random %>% arrange(p_value) %>% select(Metabolite, median_diff, p_value, FDR))
+}
+
+if(nrow(sig_median) > 0) {
+    cat("\nMedian Timepoint - Significant metabolites:\n")
+    print(sig_median %>% arrange(p_value) %>% select(Metabolite, median_diff, p_value, FDR))
+}
+
+if(nrow(sig_pod30) > 0) {
+    cat("\nPOD 30 Matching - Significant metabolites:\n")
+    print(sig_pod30 %>% arrange(p_value) %>% select(Metabolite, median_diff, p_value, FDR))
+}
+
+#=== PLOTTING FOR MATCHED ANALYSES ===
+
+# Plot significant metabolites from the best matching strategy (most significant results)
+best_strategy <- which.max(matched_summary$`Significant (p<0.05)`)
+best_name <- matched_summary$`Analysis Method`[best_strategy]
+
+cat("\n--- Plotting Results from Best Strategy:", best_name, "---\n")
+
+if(best_strategy == 1 && nrow(sig_random) > 0) {
+    if(exists("plot_ttest_bars")) {
+        matched_plots <- plot_ttest_bars(sig_random, acr_0_1r_matched_random, acr_2r_matched_random, use_median = TRUE)
+        for (met in names(matched_plots)) {
+            ggsave(
+                filename = paste0("./Immunosuppressive metabolites feature table/Results/", met, "_Matched_Random_plot.png"),
+                plot = matched_plots[[met]], dpi = 300, width = 8, height = 6
+            )
+        }
+        cat("Saved", length(matched_plots), "matched analysis plots (random strategy).\n")
+    }
+} else if(best_strategy == 2 && nrow(sig_median) > 0) {
+    if(exists("plot_ttest_bars")) {
+        matched_plots <- plot_ttest_bars(sig_median, acr_0_1r_matched_median, acr_2r_matched_median, use_median = TRUE)
+        for (met in names(matched_plots)) {
+            ggsave(
+                filename = paste0("./Immunosuppressive metabolites feature table/Results/", met, "_Matched_Median_plot.png"),
+                plot = matched_plots[[met]], dpi = 300, width = 8, height = 6
+            )
+        }
+        cat("Saved", length(matched_plots), "matched analysis plots (median timepoint strategy).\n")
+    }
+} else if(best_strategy == 3 && nrow(sig_pod30) > 0) {
+    if(exists("plot_ttest_bars")) {
+        matched_plots <- plot_ttest_bars(sig_pod30, acr_0_1r_matched_pod30, acr_2r_matched_pod30, use_median = TRUE)
+        for (met in names(matched_plots)) {
+            ggsave(
+                filename = paste0("./Immunosuppressive metabolites feature table/Results/", met, "_Matched_POD30_plot.png"),
+                plot = matched_plots[[met]], dpi = 300, width = 8, height = 6
+            )
+        }
+        cat("Saved", length(matched_plots), "matched analysis plots (POD 30 strategy).\n")
+    }
+}
+
+cat("\n=== MATCHED PATIENT ANALYSIS COMPLETE ===\n")
+cat("This analysis provides proper statistical independence by using one sample per patient.\n")
+cat("Compare these results with the previous analyses to see the impact of patient-level matching.\n")
+
+#-=== POD DISTRIBUTION ANALYSIS ===
+
+cat("\n=== ANALYZING POD DISTRIBUTION PER PATIENT ===\n")
+
+# Create comprehensive POD summary
+pod_analysis <- nonlog2_data %>%
+    group_by(H) %>%
+    summarise(
+        n_samples = n(),
+        min_POD = min(POD, na.rm = TRUE),
+        max_POD = max(POD, na.rm = TRUE),
+        median_POD = median(POD, na.rm = TRUE),
+        range_POD = max_POD - min_POD,
+        pod_values = list(POD),
+        acr_types = paste(unique(ACR), collapse = ", "),
+        has_2R = any(grepl("^2R", ACR, ignore.case = TRUE)),
+        .groups = "drop"
+    ) %>%
+    arrange(min_POD)
+
+# Basic statistics
+cat("--- POD Range Summary ---\n")
+cat("Overall POD range:", min(nonlog2_data$POD, na.rm = TRUE), "to", max(nonlog2_data$POD, na.rm = TRUE), "days\n")
+cat("Median POD across all samples:", median(nonlog2_data$POD, na.rm = TRUE), "days\n")
+cat("Patients with >1 sample:", sum(pod_analysis$n_samples > 1), "\n")
+cat("Patients with 2R episodes:", sum(pod_analysis$has_2R), "\n\n")
+
+# Show patient ranges
+cat("--- Patient POD Ranges ---\n")
+print(pod_analysis %>% 
+      select(H, n_samples, min_POD, max_POD, range_POD, acr_types, has_2R) %>%
+      head(20))  # Show first 20 patients
+
+# Create visualization
+library(ggplot2)
+
+# Plot 1: POD ranges per patient (horizontal lines)
+p1 <- pod_analysis %>%
+    mutate(H_ordered = reorder(H, min_POD)) %>%
+    ggplot(aes(y = H_ordered)) +
+    geom_segment(aes(x = min_POD, xend = max_POD, 
+                     color = has_2R), 
+                 size = 1.5, alpha = 0.7) +
+    geom_point(aes(x = min_POD), size = 2, alpha = 0.8) +
+    geom_point(aes(x = max_POD), size = 2, alpha = 0.8) +
+    scale_color_manual(values = c("FALSE" = "blue", "TRUE" = "red"),
+                       labels = c("No 2R", "Has 2R"),
+                       name = "Rejection Status") +
+    labs(title = "POD Sampling Range by Patient",
+         subtitle = "Each line shows the POD range sampled for each patient",
+         x = "Post-Operative Days (POD)",
+         y = "Patient ID") +
+    theme_minimal() +
+    theme(axis.text.y = element_text(size = 6))
+
+print(p1)
+
+# Plot 2: Distribution of all POD values with patient coloring
+p2 <- nonlog2_data %>%
+    mutate(has_2R = H %in% patients_with_2R$H) %>%
+    ggplot(aes(x = POD, fill = has_2R)) +
+    geom_histogram(bins = 30, alpha = 0.7, position = "identity") +
+    scale_fill_manual(values = c("FALSE" = "blue", "TRUE" = "red"),
+                      labels = c("No 2R", "Has 2R"),
+                      name = "Rejection Status") +
+    labs(title = "Distribution of All POD Values",
+         subtitle = "Histogram of sampling timepoints",
+         x = "Post-Operative Days (POD)",
+         y = "Number of Samples") +
+    theme_minimal()
+
+print(p2)
+
+# Plot 3: POD vs ACR status
+p3 <- nonlog2_data %>%
+    ggplot(aes(x = ACR, y = POD, fill = ACR)) +
+    geom_boxplot(alpha = 0.7) +
+    geom_jitter(width = 0.2, alpha = 0.5) +
+    labs(title = "POD Distribution by ACR Status",
+         subtitle = "When do different rejection grades occur?",
+         x = "ACR Grade",
+         y = "Post-Operative Days (POD)") +
+    theme_minimal() +
+    theme(legend.position = "none")
+
+print(p3)
+
+# Overlap analysis
+cat("\n--- POD Overlap Analysis ---\n")
+
+# Find overlapping POD ranges between patients
+overlap_pairs <- expand.grid(i = 1:nrow(pod_analysis), j = 1:nrow(pod_analysis)) %>%
+    filter(i < j) %>%
+    mutate(
+        patient1 = pod_analysis$H[i],
+        patient2 = pod_analysis$H[j],
+        min1 = pod_analysis$min_POD[i],
+        max1 = pod_analysis$max_POD[i],
+        min2 = pod_analysis$min_POD[j],
+        max2 = pod_analysis$max_POD[j],
+        overlap_start = pmax(min1, min2),
+        overlap_end = pmin(max1, max2),
+        overlap_days = pmax(0, overlap_end - overlap_start),
+        has_overlap = overlap_days > 0
+    ) %>%
+    filter(has_overlap) %>%
+    arrange(desc(overlap_days))
+
+cat("Number of patient pairs with overlapping POD ranges:", nrow(overlap_pairs), "\n")
+cat("Total possible pairs:", choose(nrow(pod_analysis), 2), "\n")
+cat("% of pairs with overlap:", round(nrow(overlap_pairs) / choose(nrow(pod_analysis), 2) * 100, 1), "%\n")
+
+if(nrow(overlap_pairs) > 0) {
+    cat("\nTop 10 overlapping patient pairs:\n")
+    print(overlap_pairs %>% 
+          select(patient1, patient2, overlap_days, min1, max1, min2, max2) %>%
+          head(10))
+}
+
+# Common POD timepoints
+cat("\n--- Most Common POD Timepoints ---\n")
+common_pods <- nonlog2_data %>%
+    count(POD, sort = TRUE) %>%
+    head(15)
+print(common_pods)
+
+# POD clustering analysis
+cat("\n--- POD Clustering Analysis ---\n")
+pod_clusters <- nonlog2_data %>%
+    mutate(
+        POD_group = case_when(
+            POD <= 30 ~ "Early (≤30 days)",
+            POD <= 90 ~ "Medium (31-90 days)",
+            POD <= 180 ~ "Late (91-180 days)",
+            TRUE ~ "Very Late (>180 days)"
+        )
+    ) %>%
+    count(POD_group, ACR) %>%
+    pivot_wider(names_from = ACR, values_from = n, values_fill = 0)
+
+print(pod_clusters)
+
+# Save plots
+ggsave("./Immunosuppressive metabolites feature table/Results/POD_Patient_Ranges.png", 
+       plot = p1, width = 12, height = 10, dpi = 300)
+ggsave("./Immunosuppressive metabolites feature table/Results/POD_Distribution_Histogram.png", 
+       plot = p2, width = 10, height = 6, dpi = 300)
+ggsave("./Immunosuppressive metabolites feature table/Results/POD_by_ACR_Status.png", 
+       plot = p3, width = 8, height = 6, dpi = 300)
+
+cat("\nPOD analysis plots saved to Results folder.\n")

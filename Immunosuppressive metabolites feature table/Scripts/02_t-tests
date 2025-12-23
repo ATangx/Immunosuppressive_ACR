@@ -1,0 +1,48 @@
+#* Perform t-tests between ACR 0/1R and 2R+ for each metabolite
+    ttest_res <- lapply(seq_along(acr_0_1r), function(i) {
+    ttest <- t.test(acr_0_1r[[i]], acr_2r[[i]])
+    as.tibble(data.frame(
+        Metabolite = colnames(acr_0_1r)[i],
+        Mean_0_1R = mean(acr_0_1r[[i]], na.rm = TRUE),
+        Mean_2R_plus = mean(acr_2r[[i]], na.rm = TRUE),
+        mean_diff = diff(ttest$estimate),
+        p_value = ttest$p.value
+        ))
+    })
+    ttest_res <- bind_rows(ttest_res)
+#* Perform t-tests between ACR 0/1R and 2R+ for each metabolite but with medians instead of means
+    ttest_res_median <- lapply(seq_along(acr_0_1r), function(i) {
+    group1 <- acr_0_1r[[i]]
+    group2 <- acr_2r[[i]]
+    median1 <- median(group1, na.rm = TRUE)
+    median2 <- median(group2, na.rm = TRUE)
+    mean_diff <- median2 - median1
+    # Perform Wilcoxon rank-sum test
+    wilcox_test <- wilcox.test(group1, group2)
+    as_tibble(data.frame(
+        Metabolite = colnames(acr_0_1r)[i],
+        Median_0_1R = median1,
+        Median_2R_plus = median2,
+        median_diff = mean_diff,
+        p_value = wilcox_test$p.value
+        ))
+    })
+    ttest_res_median <- bind_rows(ttest_res_median)
+
+#* Plot bar graphs with the median for significant metabolites based on median t-tests
+    sig_mets_median <- ttest_res_median %>%
+      filter(p_value < 0.05)
+    ttest_bars_median <- plot_ttest_bars(sig_mets_median, acr_0_1r, acr_2r, use_median = TRUE)
+
+#* Plot bar graphs with dot plots for significant metabolites
+    sig_mets <- ttest_res %>%
+      filter(p_value < 0.05)
+    ttest_bars <- plot_ttest_bars(sig_mets, acr_0_1r, acr_2r)
+#* OPTIONAL: Save plots to files
+    for (met in names(ttest_bars)) {
+        ggsave(
+            filename = paste0("./Results/", met, "_ACR_plot.png"),
+            plot = ttest_bars[[met]],
+            dpi = 300
+        )
+    }

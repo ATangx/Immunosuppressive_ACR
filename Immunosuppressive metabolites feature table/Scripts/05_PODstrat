@@ -1,12 +1,10 @@
-#- Stratified analysis by POD timepoints
-
-# Source all required data and functions
-source("Immunosuppressive metabolites feature table/Scripts/00_source")
-
-#=== POD-STRATIFIED ANALYSIS: SAME AS 03_TESTS BUT BY POD STRATA ===
+#-=== POD-STRATIFIED ANALYSIS: SAME AS 03_TESTS BUT BY POD STRATA ===
 
 cat("\n=== POD-STRATIFIED METABOLITE ANALYSIS ===\n")
 cat("Performing the same analysis as 03_tests but within each POD timepoint\n\n")
+
+# Source all required data and functions
+source("Immunosuppressive metabolites feature table/Scripts/00_source")
 
 # Define POD groups/strata for analysis
 pod_strata <- list(
@@ -25,6 +23,13 @@ pod_strata_quartiles <- list(
   "Q2 (Early-Med)" = c(pod_quartiles[2] + 1, pod_quartiles[3]),
   "Q3 (Med-Late)" = c(pod_quartiles[3] + 1, pod_quartiles[4]), 
   "Q4 (Latest)" = c(pod_quartiles[4] + 1, pod_quartiles[5])
+)
+
+# Alternative 2: Use below and above median POD
+pod_median <- median(patients_with_2R$POD, na.rm = TRUE)
+pod_strata_median <- list(
+  "Below Median" = c(0, pod_median),
+  "Above Median" = c(pod_median + 1, Inf)
 )
 
 # Function to perform the same 4 analyses as 03_tests within each POD stratum
@@ -221,6 +226,11 @@ results_predefined <- perform_pod_stratified_analysis(patients_with_2R, pod_stra
 cat("\n\n=== ANALYSIS WITH QUARTILE-BASED POD STRATA ===")
 results_quartiles <- perform_pod_stratified_analysis(patients_with_2R, pod_strata_quartiles, "Quartile Strata")
 
+# Run analysis with median-based strata
+cat("\n\n=== ANALYSIS WITH MEDIAN-BASED POD STRATA ===")
+cat("POD Median:", round(pod_median), "days\n")
+results_median <- perform_pod_stratified_analysis(patients_with_2R, pod_strata_median, "Median Strata")
+
 #=== SUMMARY ACROSS ALL STRATA ===
 
 cat("\n\n=== COMPREHENSIVE SUMMARY ACROSS ALL STRATA ===\n")
@@ -256,10 +266,16 @@ if(length(results_quartiles) > 0) {
   summary_quartiles <- create_summary_table(results_quartiles, "Quartiles")
 }
 
-# Combine summaries
+# NEW: Create median-based summary
+if(length(results_median) > 0) {
+  summary_median <- create_summary_table(results_median, "Median")
+}
+
+# Combine summaries (including new median-based results)
 all_summaries <- bind_rows(
   if(exists("summary_predefined")) summary_predefined else NULL,
-  if(exists("summary_quartiles")) summary_quartiles else NULL
+  if(exists("summary_quartiles")) summary_quartiles else NULL,
+  if(exists("summary_median")) summary_median else NULL
 )
 
 if(nrow(all_summaries) > 0) {
@@ -270,8 +286,9 @@ if(nrow(all_summaries) > 0) {
   all_results_export <- list()
   
   # Combine all results for export
-  for(analysis_name in c("Predefined", "Quartiles")) {
-    results_list <- if(analysis_name == "Predefined") results_predefined else results_quartiles
+  for(analysis_name in c("Predefined", "Quartiles", "Median")) {
+    results_list <- if(analysis_name == "Predefined") results_predefined else 
+                   if(analysis_name == "Quartiles") results_quartiles else results_median
     
     for(stratum_name in names(results_list)) {
       stratum_data <- results_list[[stratum_name]]
@@ -486,8 +503,17 @@ if(length(results_quartiles) > 0) {
     }
 }
 
-#=== CREATE PLOTS FOR SIGNIFICANT RESULTS ===
+# NEW: Process median-based strata results
+if(length(results_median) > 0) {
+    for(stratum_name in names(results_median)) {
+        stratum_results <- results_median[[stratum_name]]
+        clinical_results <- create_clinical_tables_for_stratum(stratum_results, stratum_name)
+        all_clinical_tables[[paste("Median", stratum_name, sep = "_")]] <- clinical_results
+    }
+}
 
+#=== CREATE PLOTS FOR SIGNIFICANT RESULTS ===
+#! including p-values < 0.1 for now
 cat("\n=== CREATING PLOTS FOR SIGNIFICANT POD-STRATIFIED RESULTS ===\n")
 
 # Create plots for each stratum with significant results
@@ -497,7 +523,7 @@ create_plots_for_stratum <- function(stratum_results, stratum_name, stratum_data
     
     # Plot significant t-test results
     if(!is.null(stratum_results$ttest) && nrow(stratum_results$ttest) > 0) {
-        sig_ttest <- stratum_results$ttest %>% filter(p_value < 0.05)
+        sig_ttest <- stratum_results$ttest %>% filter(p_value < 0.1)
         
         if(nrow(sig_ttest) > 0 && exists("plot_ttest_bars")) {
             # Prepare data for plotting (remove metadata columns)
@@ -523,7 +549,7 @@ create_plots_for_stratum <- function(stratum_results, stratum_name, stratum_data
     
     # Plot significant Wilcoxon results
     if(!is.null(stratum_results$wilcoxon_nonlog2) && nrow(stratum_results$wilcoxon_nonlog2) > 0) {
-        sig_wilcox <- stratum_results$wilcoxon_nonlog2 %>% filter(p_value < 0.05)
+        sig_wilcox <- stratum_results$wilcoxon_nonlog2 %>% filter(p_value < 0.1)
         
         if(nrow(sig_wilcox) > 0 && exists("plot_ttest_bars")) {
             # Prepare data for plotting
@@ -583,11 +609,282 @@ for(stratum_name in names(results_quartiles)) {
     total_plots <- total_plots + plots_created
 }
 
+# NEW: Process median-based strata
+for(stratum_name in names(results_median)) {
+    stratum_results <- results_median[[stratum_name]]
+    
+    # Get original stratum data for plotting
+    range_vals <- pod_strata_median[[stratum_name]]
+    stratum_data <- patients_with_2R %>%
+        filter(POD >= range_vals[1] & POD <= range_vals[2])
+    
+    plots_created <- create_plots_for_stratum(stratum_results, 
+                                            paste("Median", stratum_name), 
+                                            stratum_data)
+    total_plots <- total_plots + plots_created
+}
+
 cat("Created", total_plots, "plots for significant POD-stratified results.\n")
 
 #=== EXPORT ALL TABLES AND RESULTS ===
 
 cat("\n=== EXPORTING ALL POD-STRATIFIED TABLES AND RESULTS ===\n")
+
+#=== INDIVIDUAL EXPORTS FOR T-TESTS AND PATIENT-LEVEL STATS BY STRATUM ===
+
+cat("=== EXPORTING INDIVIDUAL T-TEST AND PATIENT-LEVEL RESULTS BY STRATUM ===\n")
+
+# Export individual t-test results for each stratum
+export_individual_results <- function(results_list, analysis_prefix) {
+  
+  for(stratum_name in names(results_list)) {
+    stratum_results <- results_list[[stratum_name]]
+    clean_stratum_name <- gsub("[^A-Za-z0-9]", "_", stratum_name)
+    
+    # Export t-test results
+    if(!is.null(stratum_results$ttest) && nrow(stratum_results$ttest) > 0) {
+      ttest_file <- paste0("./Immunosuppressive metabolites feature table/Results/TTest_", 
+                          analysis_prefix, "_", clean_stratum_name, ".csv")
+      write_csv(stratum_results$ttest, ttest_file)
+      cat("Exported t-test results for", analysis_prefix, stratum_name, "to:", ttest_file, "\n")
+    }
+    
+    # Export Wilcoxon log2 results
+    if(!is.null(stratum_results$wilcoxon_log2) && nrow(stratum_results$wilcoxon_log2) > 0) {
+      wilcox_log2_file <- paste0("./Immunosuppressive metabolites feature table/Results/WilcoxonLog2_", 
+                                analysis_prefix, "_", clean_stratum_name, ".csv")
+      write_csv(stratum_results$wilcoxon_log2, wilcox_log2_file)
+      cat("Exported Wilcoxon log2 results for", analysis_prefix, stratum_name, "to:", wilcox_log2_file, "\n")
+    }
+    
+    # Export Wilcoxon non-log2 results
+    if(!is.null(stratum_results$wilcoxon_nonlog2) && nrow(stratum_results$wilcoxon_nonlog2) > 0) {
+      wilcox_nonlog2_file <- paste0("./Immunosuppressive metabolites feature table/Results/WilcoxonNonLog2_", 
+                                   analysis_prefix, "_", clean_stratum_name, ".csv")
+      write_csv(stratum_results$wilcoxon_nonlog2, wilcox_nonlog2_file)
+      cat("Exported Wilcoxon non-log2 results for", analysis_prefix, stratum_name, "to:", wilcox_nonlog2_file, "\n")
+    }
+    
+    # Export patient-level results
+    if(!is.null(stratum_results$patient_level) && nrow(stratum_results$patient_level) > 0) {
+      patient_file <- paste0("./Immunosuppressive metabolites feature table/Results/PatientLevel_", 
+                            analysis_prefix, "_", clean_stratum_name, ".csv")
+      write_csv(stratum_results$patient_level, patient_file)
+      cat("Exported patient-level results for", analysis_prefix, stratum_name, "to:", patient_file, "\n")
+    }
+  }
+}
+
+# Export individual results for predefined strata
+if(length(results_predefined) > 0) {
+  cat("\n--- Exporting Predefined POD Strata Individual Results ---\n")
+  export_individual_results(results_predefined, "Predefined")
+}
+
+# Export individual results for quartile strata
+if(length(results_quartiles) > 0) {
+  cat("\n--- Exporting Quartile POD Strata Individual Results ---\n")
+  export_individual_results(results_quartiles, "Quartile")
+}
+
+# NEW: Export individual results for median-based strata
+if(length(results_median) > 0) {
+  cat("\n--- Exporting Median POD Strata Individual Results ---\n")
+  export_individual_results(results_median, "Median")
+}
+
+#=== CREATE COMBINED SUMMARY TABLES BY TEST TYPE ===
+
+cat("\n=== CREATING COMBINED SUMMARY TABLES BY TEST TYPE ===\n")
+
+# Combine all t-test results across all strata
+all_ttest_results <- list()
+all_wilcox_log2_results <- list()
+all_wilcox_nonlog2_results <- list()
+all_patient_results <- list()
+
+# Collect results from predefined strata
+if(length(results_predefined) > 0) {
+  for(stratum_name in names(results_predefined)) {
+    stratum_results <- results_predefined[[stratum_name]]
+    stratum_key <- paste("Predefined", stratum_name)
+    
+    if(!is.null(stratum_results$ttest)) {
+      all_ttest_results[[stratum_key]] <- stratum_results$ttest %>% 
+        mutate(Analysis_Group = "Predefined", Stratum = stratum_name)
+    }
+    if(!is.null(stratum_results$wilcoxon_log2)) {
+      all_wilcox_log2_results[[stratum_key]] <- stratum_results$wilcoxon_log2 %>% 
+        mutate(Analysis_Group = "Predefined", Stratum = stratum_name)
+    }
+    if(!is.null(stratum_results$wilcoxon_nonlog2)) {
+      all_wilcox_nonlog2_results[[stratum_key]] <- stratum_results$wilcoxon_nonlog2 %>% 
+        mutate(Analysis_Group = "Predefined", Stratum = stratum_name)
+    }
+    if(!is.null(stratum_results$patient_level)) {
+      all_patient_results[[stratum_key]] <- stratum_results$patient_level %>% 
+        mutate(Analysis_Group = "Predefined", Stratum = stratum_name)
+    }
+  }
+}
+
+# Collect results from quartile strata
+if(length(results_quartiles) > 0) {
+  for(stratum_name in names(results_quartiles)) {
+    stratum_results <- results_quartiles[[stratum_name]]
+    stratum_key <- paste("Quartile", stratum_name)
+    
+    if(!is.null(stratum_results$ttest)) {
+      all_ttest_results[[stratum_key]] <- stratum_results$ttest %>% 
+        mutate(Analysis_Group = "Quartile", Stratum = stratum_name)
+    }
+    if(!is.null(stratum_results$wilcoxon_log2)) {
+      all_wilcox_log2_results[[stratum_key]] <- stratum_results$wilcoxon_log2 %>% 
+        mutate(Analysis_Group = "Quartile", Stratum = stratum_name)
+    }
+    if(!is.null(stratum_results$wilcoxon_nonlog2)) {
+      all_wilcox_nonlog2_results[[stratum_key]] <- stratum_results$wilcoxon_nonlog2 %>% 
+        mutate(Analysis_Group = "Quartile", Stratum = stratum_name)
+    }
+    if(!is.null(stratum_results$patient_level)) {
+      all_patient_results[[stratum_key]] <- stratum_results$patient_level %>% 
+        mutate(Analysis_Group = "Quartile", Stratum = stratum_name)
+    }
+  }
+}
+
+# NEW: Collect results from median-based strata
+if(length(results_median) > 0) {
+  for(stratum_name in names(results_median)) {
+    stratum_results <- results_median[[stratum_name]]
+    stratum_key <- paste("Median", stratum_name)
+    
+    if(!is.null(stratum_results$ttest)) {
+      all_ttest_results[[stratum_key]] <- stratum_results$ttest %>% 
+        mutate(Analysis_Group = "Median", Stratum = stratum_name)
+    }
+    if(!is.null(stratum_results$wilcoxon_log2)) {
+      all_wilcox_log2_results[[stratum_key]] <- stratum_results$wilcoxon_log2 %>% 
+        mutate(Analysis_Group = "Median", Stratum = stratum_name)
+    }
+    if(!is.null(stratum_results$wilcoxon_nonlog2)) {
+      all_wilcox_nonlog2_results[[stratum_key]] <- stratum_results$wilcoxon_nonlog2 %>% 
+        mutate(Analysis_Group = "Median", Stratum = stratum_name)
+    }
+    if(!is.null(stratum_results$patient_level)) {
+      all_patient_results[[stratum_key]] <- stratum_results$patient_level %>% 
+        mutate(Analysis_Group = "Median", Stratum = stratum_name)
+    }
+  }
+}
+
+# Export combined results by test type
+if(length(all_ttest_results) > 0) {
+  combined_ttest <- bind_rows(all_ttest_results)
+  write_csv(combined_ttest, "./Immunosuppressive metabolites feature table/Results/POD_Combined_TTest_All_Strata.csv")
+  cat("Exported combined t-test results across all strata to: POD_Combined_TTest_All_Strata.csv\n")
+}
+
+if(length(all_wilcox_log2_results) > 0) {
+  combined_wilcox_log2 <- bind_rows(all_wilcox_log2_results)
+  write_csv(combined_wilcox_log2, "./Immunosuppressive metabolites feature table/Results/POD_Combined_WilcoxonLog2_All_Strata.csv")
+  cat("Exported combined Wilcoxon log2 results across all strata to: POD_Combined_WilcoxonLog2_All_Strata.csv\n")
+}
+
+if(length(all_wilcox_nonlog2_results) > 0) {
+  combined_wilcox_nonlog2 <- bind_rows(all_wilcox_nonlog2_results)
+  write_csv(combined_wilcox_nonlog2, "./Immunosuppressive metabolites feature table/Results/POD_Combined_WilcoxonNonLog2_All_Strata.csv")
+  cat("Exported combined Wilcoxon non-log2 results across all strata to: POD_Combined_WilcoxonNonLog2_All_Strata.csv\n")
+}
+
+if(length(all_patient_results) > 0) {
+  combined_patient <- bind_rows(all_patient_results)
+  write_csv(combined_patient, "./Immunosuppressive metabolites feature table/Results/POD_Combined_PatientLevel_All_Strata.csv")
+  cat("Exported combined patient-level results across all strata to: POD_Combined_PatientLevel_All_Strata.csv\n")
+}
+
+#=== CREATE SIGNIFICANCE SUMMARY ACROSS ALL STRATA ===
+
+cat("\n=== CREATING SIGNIFICANCE SUMMARY ACROSS ALL STRATA ===\n")
+
+# Create significance summary table
+significance_summary <- tibble()
+
+if(exists("combined_ttest")) {
+  ttest_sig <- combined_ttest %>%
+    group_by(Analysis_Group, Stratum) %>%
+    summarise(
+      TTest_Total = n(),
+      TTest_Sig_P005 = sum(p_value < 0.05, na.rm = TRUE),
+      TTest_Sig_FDR005 = sum(FDR < 0.05, na.rm = TRUE),
+      .groups = "drop"
+    )
+  significance_summary <- bind_rows(significance_summary, ttest_sig)
+}
+
+if(exists("combined_wilcox_log2")) {
+  wilcox_log2_sig <- combined_wilcox_log2 %>%
+    group_by(Analysis_Group, Stratum) %>%
+    summarise(
+      WilcoxLog2_Total = n(),
+      WilcoxLog2_Sig_P005 = sum(p_value < 0.05, na.rm = TRUE),
+      WilcoxLog2_Sig_FDR005 = sum(FDR < 0.05, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  if(nrow(significance_summary) > 0) {
+    significance_summary <- significance_summary %>%
+      left_join(wilcox_log2_sig, by = c("Analysis_Group", "Stratum"))
+  } else {
+    significance_summary <- wilcox_log2_sig
+  }
+}
+
+if(exists("combined_wilcox_nonlog2")) {
+  wilcox_nonlog2_sig <- combined_wilcox_nonlog2 %>%
+    group_by(Analysis_Group, Stratum) %>%
+    summarise(
+      WilcoxNonLog2_Total = n(),
+      WilcoxNonLog2_Sig_P005 = sum(p_value < 0.05, na.rm = TRUE),
+      WilcoxNonLog2_Sig_FDR005 = sum(FDR < 0.05, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  if(nrow(significance_summary) > 0) {
+    significance_summary <- significance_summary %>%
+      left_join(wilcox_nonlog2_sig, by = c("Analysis_Group", "Stratum"))
+  } else {
+    significance_summary <- wilcox_nonlog2_sig
+  }
+}
+
+if(exists("combined_patient")) {
+  patient_sig <- combined_patient %>%
+    group_by(Analysis_Group, Stratum) %>%
+    summarise(
+      PatientLevel_Total = n(),
+      PatientLevel_Sig_P005 = sum(p_value < 0.05, na.rm = TRUE),
+      PatientLevel_Sig_FDR005 = sum(FDR < 0.05, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  if(nrow(significance_summary) > 0) {
+    significance_summary <- significance_summary %>%
+      left_join(patient_sig, by = c("Analysis_Group", "Stratum"))
+  } else {
+    significance_summary <- patient_sig
+  }
+}
+
+# Export significance summary
+if(nrow(significance_summary) > 0) {
+  write_csv(significance_summary, "./Immunosuppressive metabolites feature table/Results/POD_Significance_Summary_All_Tests.csv")
+  cat("Exported comprehensive significance summary to: POD_Significance_Summary_All_Tests.csv\n")
+  
+  # Display summary
+  cat("\n--- Significance Summary Across All POD Strata ---\n")
+  print(significance_summary)
+}
 
 # Export Table 1 results
 if(length(stratum_table1_results) > 0) {
@@ -682,7 +979,19 @@ cat("\n=== POD-STRATIFIED TABLE AND PLOT CREATION COMPLETE ===\n")
 cat("Check the Results folder for:\n")
 cat("1. POD_Stratified_Table1_All_Strata.docx - Main clinical tables by POD strata\n")
 cat("2. POD_Stratified_Clinical_Format_All_Tables.docx - All analyses in clinical format by POD strata\n")
-cat("3. Individual POD stratum files and CSV backups\n")
-cat("4. Plot files for significant metabolites by POD strata\n")
-cat("5. POD_Stratified_Complete_Analysis.csv and POD_Stratified_Summary.csv - Statistical results\n")
+cat("3. Individual files by stratum and test type:\n")
+cat("   - TTest_[Analysis]_[Stratum].csv - T-test results for each stratum\n")
+cat("   - WilcoxonLog2_[Analysis]_[Stratum].csv - Wilcoxon log2 results for each stratum\n")
+cat("   - WilcoxonNonLog2_[Analysis]_[Stratum].csv - Wilcoxon non-log2 results for each stratum\n")
+cat("   - PatientLevel_[Analysis]_[Stratum].csv - Patient-level results for each stratum\n")
+cat("4. Combined results across all strata:\n")
+cat("   - POD_Combined_TTest_All_Strata.csv - All t-test results\n")
+cat("   - POD_Combined_WilcoxonLog2_All_Strata.csv - All Wilcoxon log2 results\n")
+cat("   - POD_Combined_WilcoxonNonLog2_All_Strata.csv - All Wilcoxon non-log2 results\n")
+cat("   - POD_Combined_PatientLevel_All_Strata.csv - All patient-level results\n")
+cat("5. Summary files:\n")
+cat("   - POD_Significance_Summary_All_Tests.csv - Comprehensive significance summary\n")
+cat("   - POD_Stratified_Complete_Analysis.csv and POD_Stratified_Summary.csv - Original statistical results\n")
+cat("6. Plot files for significant metabolites by POD strata\n")
+cat("7. Individual POD stratum CSV backups for Table 1 data\n")
 

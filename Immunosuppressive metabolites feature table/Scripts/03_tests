@@ -1,21 +1,18 @@
-#- Tests on immunosuppressive metabolites by ACR status pre-2R vs active 2R (ACR 01/2R vs 2R+)
-#! this is taking all samples from patients with at least one 2R episode and comparing all ACR 0/1R vs 2R+ samples
-
-#+ Source libraries, data setup, and plotting functions
+#- Source libraries, data setup, and plotting functions
 source("Immunosuppressive metabolites feature table/Scripts/01_libraries")
 source("Immunosuppressive metabolites feature table/Scripts/02_setup")
 source("Immunosuppressive metabolites feature table/Scripts/03_plotting_functions")
 
-#=== ANALYSIS 1: T-TESTS ON LOG2 DATA ===
+#=== ANALYSIS 1: T-TESTS ON NON-LOG2 DATA ===
 
-#+ Perform t-tests between ACR 0/1R and 2R+ for each metabolite (using log2 data for proper statistical testing)
-    ttest_res <- lapply(seq_along(acr_0_1r_log2), function(i) {
-    ttest <- t.test(acr_0_1r_log2[[i]], acr_2r_log2[[i]])
+#+ Perform t-tests between ACR 0/1R and 2R+ for each metabolite (original approach)
+    ttest_res <- lapply(seq_along(acr_0_1r), function(i) {
+    ttest <- t.test(acr_0_1r[[i]], acr_2r[[i]])
     as_tibble(data.frame(
-        Metabolite = colnames(acr_0_1r_log2)[i],
-        Mean_0_1R_log2 = mean(acr_0_1r_log2[[i]], na.rm = TRUE),
-        Mean_2R_plus_log2 = mean(acr_2r_log2[[i]], na.rm = TRUE),
-        mean_diff_log2 = diff(ttest$estimate),
+        Metabolite = colnames(acr_0_1r)[i],
+        Mean_0_1R = mean(acr_0_1r[[i]], na.rm = TRUE),
+        Mean_2R_plus = mean(acr_2r[[i]], na.rm = TRUE),
+        mean_diff = diff(ttest$estimate),
         p_value = ttest$p.value
         ))
     })
@@ -25,22 +22,22 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
     sig_mets_ttest <- ttest_res %>%
       filter(p_value < 0.05)
     
-    cat("T-test results (log2 data):\n")
+    cat("T-test results (non-log2 data):\n")
     cat("Total metabolites tested:", nrow(ttest_res), "\n")
     cat("Significant metabolites (p < 0.05):", nrow(sig_mets_ttest), "\n")
     
     if (nrow(sig_mets_ttest) > 0) {
-        cat("Significant metabolites (t-test on log2 data):\n")
+        cat("Significant metabolites (t-test):\n")
         print(sig_mets_ttest)
         
         # Create and save plots
         if (exists("plot_ttest_bars")) {
             ttest_bars <- plot_ttest_bars(sig_mets_ttest, acr_0_1r, acr_2r, use_median = FALSE)
             
-            # Save plots to files (using non-log2 data for visualization)
+            # Save plots to files
             for (met in names(ttest_bars)) {
                 ggsave(
-                    filename = paste0("./Immunosuppressive metabolites feature table/Results/Dump_122325/", met, "_T-test_log2_plot_AT.png"),
+                    filename = paste0("./Immunosuppressive metabolites feature table/Results/", met, "_T-test_plot_AT.png"),
                     plot = ttest_bars[[met]],
                     dpi = 300,
                     width = 8, height = 6
@@ -76,12 +73,12 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
 
 #+ Plot bar graphs with the median for significant metabolites based on Wilcoxon tests
     sig_mets_median <- ttest_res_median %>%
-      filter(p_value < 0.1)
+      filter(p_value < 0.05)
     
     # Display sample-level results summary
     cat("Sample-level Wilcoxon test results:\n")
     cat("Total metabolites tested:", nrow(ttest_res_median), "\n")
-    cat("Significant metabolites (p < 0.1):", nrow(sig_mets_median), "\n")
+    cat("Significant metabolites (p < 0.05):", nrow(sig_mets_median), "\n")
     cat("Smallest p-value:", min(ttest_res_median$p_value, na.rm = TRUE), "\n")
     
     if (nrow(sig_mets_median) > 0) {
@@ -99,7 +96,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         # Save plots to files
         for (met in names(ttest_bars_median)) {
             ggsave(
-                filename = paste0("./Immunosuppressive metabolites feature table/Results/Dump_122325/", met, "_Wilcoxon_plot_AT.png"),
+                filename = paste0("./Immunosuppressive metabolites feature table/Results/", met, "_Wilcoxon_plot_AT.png"),
                 plot = ttest_bars_median[[met]],
                 dpi = 300,
                 width = 8, height = 6
@@ -153,7 +150,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
             # Save plots to files
             for (met in names(wilcox_bars_nonlog2)) {
                 ggsave(
-                    filename = paste0("./Immunosuppressive metabolites feature table/Results/Dump_122325/", met, "_Wilcoxon_NonLog2_plot_AT.png"),
+                    filename = paste0("./Immunosuppressive metabolites feature table/Results/", met, "_Wilcoxon_NonLog2_plot_AT.png"),
                     plot = wilcox_bars_nonlog2[[met]],
                     dpi = 300,
                     width = 8, height = 6
@@ -242,7 +239,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         # Save patient-level plots to files
         for (met in names(ttest_bars_median_patient)) {
             ggsave(
-                filename = paste0("./Immunosuppressive metabolites feature table/Results/Dump_122325/", met, "_Patient_Level_Wilcoxon_plot_AT.png"),
+                filename = paste0("./Immunosuppressive metabolites feature table/Results/", met, "_Patient_Level_Wilcoxon_plot_AT.png"),
                 plot = ttest_bars_median_patient[[met]],
                 dpi = 300,
                 width = 8, height = 6
@@ -267,9 +264,9 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         # Prepare data for each analysis
         analysis1 <- ttest_res %>%
             mutate(
-                Analysis_Type = "T-tests (Log2)",
-                Test_Statistic = "Mean difference (log2)",
-                Data_Transform = "Log2",
+                Analysis_Type = "T-tests (Non-log2)",
+                Test_Statistic = "Mean difference",
+                Data_Transform = "Non-log2",
                 Level = "Sample"
             )
         
@@ -300,12 +297,13 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         # Combine all analyses
         combined_results <- bind_rows(analysis1, analysis2, analysis3, analysis4) %>%
             mutate(
-                Significant = ifelse(p_value < 0.05, "Yes", "No"),            Analysis_ID = case_when(
-                Analysis_Type == "T-tests (Log2)" ~ 1,
-                Analysis_Type == "Wilcoxon (Log2)" ~ 2,
-                Analysis_Type == "Wilcoxon (Non-log2)" ~ 3,
-                Analysis_Type == "Patient-level Wilcoxon" ~ 4
-            )
+                Significant = ifelse(p_value < 0.05, "Yes", "No"),
+                Analysis_ID = case_when(
+                    Analysis_Type == "T-tests (Non-log2)" ~ 1,
+                    Analysis_Type == "Wilcoxon (Log2)" ~ 2,
+                    Analysis_Type == "Wilcoxon (Non-log2)" ~ 3,
+                    Analysis_Type == "Patient-level Wilcoxon" ~ 4
+                )
             )
         
         return(combined_results)
@@ -337,7 +335,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
     
     # Generate summary for all analyses
     final_summary <- bind_rows(
-        summary_by_analysis(ttest_res, "T-tests (Log2)"),
+        summary_by_analysis(ttest_res, "T-tests (Non-log2)"),
         summary_by_analysis(ttest_res_median, "Wilcoxon (Log2)"),  
         summary_by_analysis(wilcox_res_nonlog2, "Wilcoxon (Non-log2)"),
         summary_by_analysis(ttest_res_median_patient, "Patient-level Wilcoxon")
@@ -352,7 +350,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
     cat("\n\n**Detailed Results: ALL Metabolites for Each Analysis**\n")
     cat("=====================================================\n")
     
-    cat("\n--- Analysis 1: T-tests (Log2 data) ---\n")
+    cat("\n--- Analysis 1: T-tests (Non-log2 data) ---\n")
     print(ttest_res %>% arrange(p_value), width = Inf)
     
     cat("\n--- Analysis 2: Wilcoxon (Log2 data) ---\n") 
@@ -369,7 +367,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
     cat("===============================================\n")
     
     sig_summary <- tibble(
-        `Analysis Method` = c("T-tests (Log2)", "Wilcoxon (Log2)", 
+        `Analysis Method` = c("T-tests (Non-log2)", "Wilcoxon (Log2)", 
                               "Wilcoxon (Non-log2)", "Patient-level Wilcoxon"),
         `N Significant` = c(
             nrow(filter(ttest_res, p_value < 0.05)),
@@ -472,8 +470,8 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
             flextable::autofit()
         
         # Export to Word
-        output_path_table1 <- "./Immunosuppressive metabolites feature table/Results/Dump_122325/Table1_Metabolite_Levels_By_ACR_Status.docx"
-
+        output_path_table1 <- "./Immunosuppressive metabolites feature table/Results/Table1_Metabolite_Levels_By_ACR_Status.docx"
+        
         flex_table1_metabolites %>%
             flextable::save_as_docx(path = output_path_table1)
         
@@ -497,7 +495,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
             )
         
         write.csv(table1_summary_data, 
-                  "./Immunosuppressive metabolites feature table/Results/Dump_122325/Table1_Metabolite_Summary_Data.csv", 
+                  "./Immunosuppressive metabolites feature table/Results/Table1_Metabolite_Summary_Data.csv", 
                   row.names = FALSE)
         
         cat("Table 1 summary data saved as CSV.\n")
@@ -508,7 +506,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         
         # Save raw data if Word export fails
         write.csv(table1_data, 
-                  "./Immunosuppressive metabolites feature table/Results/Dump_122325/Table1_Raw_Data.csv", 
+                  "./Immunosuppressive metabolites feature table/Results/Table1_Raw_Data.csv", 
                   row.names = FALSE)
         cat("Table 1 raw data saved as CSV.\n")
     })
@@ -527,21 +525,15 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
     }
     library(officer)
     
-    # Format T-test Results in Clinical Style (convert log2 back to original scale for display)
+    # Format T-test Results in Clinical Style
     ttest_clinical <- ttest_res %>%
         arrange(p_value) %>%
         mutate(
-            # Convert log2 means back to original scale for clinical interpretation
-            Mean_0_1R_original = 2^Mean_0_1R_log2,
-            Mean_2R_plus_original = 2^Mean_2R_plus_log2,
-            # Calculate fold change from log2 difference
-            Fold_Change = 2^mean_diff_log2,
-            `0R/1R Group` = paste0(round(Mean_0_1R_original, 1), " (", round(sqrt(var(Mean_0_1R_original, na.rm = TRUE)), 1), ")"),
-            `2R+ Group` = paste0(round(Mean_2R_plus_original, 1), " (", round(sqrt(var(Mean_2R_plus_original, na.rm = TRUE)), 1), ")"),
-            `Fold Change (2R+/0R-1R)` = round(Fold_Change, 2),
+            `0R/1R Group` = paste0(round(Mean_0_1R, 1), " (", round(sqrt(var(Mean_0_1R, na.rm = TRUE)), 1), ")"),
+            `2R+ Group` = paste0(round(Mean_2R_plus, 1), " (", round(sqrt(var(Mean_2R_plus, na.rm = TRUE)), 1), ")"),
             `p-value` = round(p_value, 3)
         ) %>%
-        select(Metabolite, `0R/1R Group`, `2R+ Group`, `Fold Change (2R+/0R-1R)`, `p-value`)
+        select(Metabolite, `0R/1R Group`, `2R+ Group`, `p-value`)
     
     # Format Wilcoxon (Log2) Results in Clinical Style  
     wilcox_log2_clinical <- ttest_res_median %>%
@@ -589,7 +581,7 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
     # Create flextables for all clinical format tables
     clinical_ttest_table <- ttest_clinical %>%
         flextable::flextable() %>%
-        flextable::set_caption("Clinical Table 2: T-test Results (Log2 Analysis) - Mean (SD) Metabolite Levels by ACR Status") %>%
+        flextable::set_caption("Clinical Table 2: T-test Results - Mean (SD) Metabolite Levels by ACR Status") %>%
         flextable::theme_vanilla() %>%
         flextable::autofit() %>%
         flextable::bold(part = "header")
@@ -616,8 +608,8 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         flextable::bold(part = "header")
     
     # Export clinical format tables to Word
-    clinical_output_path <- "./Immunosuppressive metabolites feature table/Results/Dump_122325/Metabolomics_Clinical_Format_All_Tables.docx"
-
+    clinical_output_path <- "./Immunosuppressive metabolites feature table/Results/Metabolomics_Clinical_Format_All_Tables.docx"
+    
     tryCatch({
         # Create comprehensive clinical format document
         doc <- officer::read_docx()
@@ -633,22 +625,22 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
         cat("Successfully exported all clinical format tables to:", clinical_output_path, "\n")
         
         # Also save individual clinical tables
-        clinical_ttest_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_TTest_Results.docx")
-        clinical_wilcox_log2_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_Wilcoxon_Log2_Results.docx")
-        clinical_wilcox_nonlog2_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_Wilcoxon_NonLog2_Results.docx")
-        clinical_patient_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_Patient_Level_Results.docx")
-
+        clinical_ttest_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Clinical_TTest_Results.docx")
+        clinical_wilcox_log2_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Clinical_Wilcoxon_Log2_Results.docx")
+        clinical_wilcox_nonlog2_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Clinical_Wilcoxon_NonLog2_Results.docx")
+        clinical_patient_table %>% flextable::save_as_docx(path = "./Immunosuppressive metabolites feature table/Results/Clinical_Patient_Level_Results.docx")
+        
         cat("Individual clinical format tables also saved.\n")
         
     }, error = function(e) {
         cat("Error creating clinical format Word documents:", e$message, "\n")
         
         # Save as CSV if Word export fails
-        write.csv(ttest_clinical, "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_TTest_Results.csv", row.names = FALSE)
-        write.csv(wilcox_log2_clinical, "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_Wilcoxon_Log2_Results.csv", row.names = FALSE)
-        write.csv(wilcox_nonlog2_clinical, "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_Wilcoxon_NonLog2_Results.csv", row.names = FALSE)
-        write.csv(patient_clinical, "./Immunosuppressive metabolites feature table/Results/Dump_122325/Clinical_Patient_Level_Results.csv", row.names = FALSE)
-
+        write.csv(ttest_clinical, "./Immunosuppressive metabolites feature table/Results/Clinical_TTest_Results.csv", row.names = FALSE)
+        write.csv(wilcox_log2_clinical, "./Immunosuppressive metabolites feature table/Results/Clinical_Wilcoxon_Log2_Results.csv", row.names = FALSE)
+        write.csv(wilcox_nonlog2_clinical, "./Immunosuppressive metabolites feature table/Results/Clinical_Wilcoxon_NonLog2_Results.csv", row.names = FALSE)
+        write.csv(patient_clinical, "./Immunosuppressive metabolites feature table/Results/Clinical_Patient_Level_Results.csv", row.names = FALSE)
+        
         cat("Clinical format tables saved as CSV files.\n")
     })
     
@@ -670,4 +662,3 @@ source("Immunosuppressive metabolites feature table/Scripts/03_plotting_function
     print(clinical_wilcox_nonlog2_table)
     print(clinical_patient_table)
 
-#! For analyses on log2 scale, data is reported on original scale in clinical tables for interpretability.

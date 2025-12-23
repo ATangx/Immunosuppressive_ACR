@@ -1,0 +1,57 @@
+#* Import feature table with metadata and set up tables for comparisons
+    data_path <- "C://Users//amshu//Documents//Amshu//Emory//Research//Immunosuppressive metabolites feature table"
+    metabolite_data <- as.tibble(read.csv(file.path(data_path, "IS_metabolites_ACR.csv")))
+    nonlog2_data <- metabolite_data %>%
+      mutate(across(6:ncol(.), ~ 2^.x))
+  #+ Create table of patients with at least one 2R episode
+    patients_with_2R <- nonlog2_data %>%
+      mutate(is_2R = grepl("^2R", as.character(!!sym("ACR")), ignore.case = TRUE)) %>%
+      group_by_at(vars(all_of("H"))) %>%
+      filter(any(is_2R)) %>%
+      ungroup() %>%
+      select(-is_2R)
+  #+ Create 3 separate tables by ACR status
+    acr_0r <- patients_with_2R %>%
+      filter(ACR == "0R") %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+    acr_1r <- patients_with_2R %>%
+      filter(ACR == "1R") %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+    acr_0_1r <- patients_with_2R %>%
+      filter(ACR %in% c("0R", "1R")) %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+    acr_2r <- patients_with_2R %>%
+      filter(ACR == "2R+") %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+  #+ Classify data points by pre-2R, active 2R, post-2R
+    #! defines "active 2R" as ANY 2R episode (row with ACR matching /^2R/i) per patient,
+    #! "post-2R" as the immediate next row after a 2R episode if NOT itself 2R,
+    #! and "pre-2R" as all remaining rows.
+    
+    df2 <- patients_with_2R %>%
+      mutate(.orig_row = row_number()) %>%
+      # Group by patient
+      group_by_at(vars(all_of("H"))) %>%
+      # Arrange by POD/time if present, otherwise by original order
+      { if(!is.na("POD")) arrange(., !!sym("POD")) else arrange(., .orig_row) } %>%
+      # Classify rows as active/post/pre 2R
+      mutate(rn = row_number(),
+             is_2R = grepl("^2R", as.character(!!sym("ACR")), ignore.case = TRUE),
+             # active_2R: row itself is 2R
+             is_active2R = is_2R,
+             # post_2R: row immediately follows a 2R row AND is not itself 2R
+             is_2R_lag = lag(is_2R, default = FALSE),
+             is_post2R = is_2R_lag & !is_2R) %>%
+      ungroup() %>%
+      select(-is_2R, -is_2R_lag)
+
+      # Final tables (restore original columns only)
+      drop_flags <- c('.orig_row','is_active2R','is_post2R')
+      active_2R <- df2 %>% filter(is_active2R) %>% select(-one_of(drop_flags))
+      post_2R   <- df2 %>% filter(is_post2R)   %>% select(-one_of(drop_flags))
+      pre_2R    <- df2 %>% filter(!(is_active2R | is_post2R)) %>% select(-one_of(drop_flags))
+
+      # Expose the three tables in the global environment (names requested: pre_2R, active_2R, post_2R)
+      pre_2R$ACR_Label <- "pre 2R"
+      active_2R$ACR_Label <- "active 2R"
+      post_2R$ACR_Label <- "post 2R"

@@ -1,0 +1,220 @@
+#=== PATIENT-LEVEL ANALYSIS: COMPREHENSIVE ANALYSIS WITHOUT POD STRATIFICATION ===
+
+cat("\n=== PATIENT-LEVEL METABOLITE ANALYSIS ===\n")
+cat("Performing patient-level analysis on entire dataset (no POD stratification)\n")
+cat("Each patient contributes one aggregated data point for statistical independence\n\n")
+
+# Source all required data and plotting functions
+source("Immunosuppressive metabolites feature table/Scripts/00_source")
+
+#=== PATIENT-LEVEL DATA PREPARATION ===
+
+cat("=== PATIENT-LEVEL DATA PREPARATION ===\n")
+
+# Aggregate data to patient level using median values per patient
+cat("Aggregating data to patient level using median values...\n")
+cat("Using full dataset (all patients, including those who never had 2R+ rejection)...\n")
+
+# Get metabolite columns (exclude metadata columns)
+metadata_cols <- c("H", "POD", "S", "Sample_ID", "ACR")
+metabolite_cols <- setdiff(names(select_if(nonlog2_data, is.numeric)), metadata_cols)
+
+cat("Identified", length(metabolite_cols), "metabolite columns for analysis\n")
+
+patient_aggregated <- nonlog2_data %>%
+  group_by(H) %>%
+  summarise(
+    across(all_of(metabolite_cols), ~ median(.x, na.rm = TRUE)),
+    ACR_has_2R = any(grepl("^2R", ACR, ignore.case = TRUE)),
+    POD_min = min(POD, na.rm = TRUE),
+    POD_max = max(POD, na.rm = TRUE),
+    POD_median = median(POD, na.rm = TRUE),
+    n_samples = n(),
+    .groups = "drop"
+  )
+
+cat("Patient-level aggregation complete:\n")
+cat("Total patients:", nrow(patient_aggregated), "\n")
+cat("Patients without 2R+ rejection:", sum(!patient_aggregated$ACR_has_2R), "\n")
+cat("Patients with 2R+ rejection:", sum(patient_aggregated$ACR_has_2R), "\n")
+
+# Check for sufficient sample sizes
+if(sum(!patient_aggregated$ACR_has_2R) < 3 | sum(patient_aggregated$ACR_has_2R) < 3) {
+  stop("Insufficient patients per group for analysis (need ≥3 each)")
+}
+
+# Create patient-level groups for analysis (remove metadata columns)
+acr_0_1r_patient <- patient_aggregated %>%
+  filter(!ACR_has_2R) %>%
+  select(all_of(metabolite_cols))
+
+acr_2r_patient <- patient_aggregated %>%
+  filter(ACR_has_2R) %>%
+  select(all_of(metabolite_cols))
+
+cat("Final patient-level groups:\n")
+cat("0R/1R patients (never had 2R+):", nrow(acr_0_1r_patient), "\n")
+cat("2R+ patients (had at least one 2R+ episode):", nrow(acr_2r_patient), "\n")
+
+#=== PATIENT-LEVEL STATISTICAL ANALYSES ===
+
+cat("\n=== PATIENT-LEVEL STATISTICAL ANALYSES ===\n")
+
+# Create results directory
+results_dir <- "./Immunosuppressive metabolites feature table/Results/PatientLevel/"
+if (!dir.exists(results_dir)) {
+  dir.create(results_dir, recursive = TRUE)
+}
+
+# ANALYSIS 1: T-tests on Patient-Level Data (Non-log2)
+cat("\n--- Analysis 1: T-tests on Patient-Level Data (Non-log2) ---\n")
+ttest_res_patient <- lapply(seq_along(acr_0_1r_patient), function(i) {
+  
+  group1 <- acr_0_1r_patient[[i]]
+  group2 <- acr_2r_patient[[i]]
+  
+  # Check for sufficient data
+  if(length(group1) < 3 | length(group2) < 3) {
+    return(NULL)
+  }
+  
+  ttest <- t.test(group1, group2)
+  tibble(
+    Metabolite = colnames(acr_0_1r_patient)[i],
+    Mean_No_2R = mean(group1, na.rm = TRUE),
+    Mean_Has_2R = mean(group2, na.rm = TRUE),
+    mean_diff = diff(ttest$estimate),
+    p_value = ttest$p.value,
+    n_no_2R = length(group1),
+    n_has_2R = length(group2)
+  )
+})
+
+ttest_res_patient <- bind_rows(ttest_res_patient[!sapply(ttest_res_patient, is.null)])
+
+if(nrow(ttest_res_patient) > 0) {
+  ttest_res_patient <- ttest_res_patient %>%
+    mutate(FDR = p.adjust(p_value, method = "BH"))
+  
+  cat("Patient-level t-test results:\n")
+  cat("Total metabolites tested:", nrow(ttest_res_patient), "\n")
+  cat("Significant metabolites (p < 0.05):", sum(ttest_res_patient$p_value < 0.05, na.rm = TRUE), "\n")
+  cat("Significant metabolites (FDR < 0.05):", sum(ttest_res_patient$FDR < 0.05, na.rm = TRUE), "\n")
+}
+
+# ANALYSIS 2: Wilcoxon tests on Patient-Level Data (Log2)
+cat("\n--- Analysis 2: Wilcoxon tests on Patient-Level Data (Log2) ---\n")
+
+# Convert to log2 for Wilcoxon tests
+acr_0_1r_patient_log2 <- acr_0_1r_patient %>% 
+  mutate(across(everything(), ~ log2(.x + 0.001)))
+acr_2r_patient_log2 <- acr_2r_patient %>% 
+  mutate(across(everything(), ~ log2(.x + 0.001)))
+
+wilcox_log2_res_patient <- lapply(seq_along(acr_0_1r_patient_log2), function(i) {
+  
+  group1 <- acr_0_1r_patient_log2[[i]]
+  group2 <- acr_2r_patient_log2[[i]]
+  
+  # Check for sufficient data
+  if(length(group1) < 3 | length(group2) < 3) {
+    return(NULL)
+  }
+  
+  median1 <- median(group1, na.rm = TRUE)
+  median2 <- median(group2, na.rm = TRUE)
+  median_diff <- median2 - median1
+  wilcox_test <- wilcox.test(group1, group2)
+  
+  tibble(
+    Metabolite = colnames(acr_0_1r_patient_log2)[i],
+    Median_No_2R = median1,
+    Median_Has_2R = median2,
+    median_diff = median_diff,
+    p_value = wilcox_test$p.value,
+    n_no_2R = length(group1),
+    n_has_2R = length(group2)
+  )
+})
+
+wilcox_log2_res_patient <- bind_rows(wilcox_log2_res_patient[!sapply(wilcox_log2_res_patient, is.null)])
+
+if(nrow(wilcox_log2_res_patient) > 0) {
+  wilcox_log2_res_patient <- wilcox_log2_res_patient %>%
+    mutate(FDR = p.adjust(p_value, method = "BH"))
+  
+  cat("Patient-level Wilcoxon (log2) results:\n")
+  cat("Total metabolites tested:", nrow(wilcox_log2_res_patient), "\n")
+  cat("Significant metabolites (p < 0.05):", sum(wilcox_log2_res_patient$p_value < 0.05, na.rm = TRUE), "\n")
+  cat("Significant metabolites (FDR < 0.05):", sum(wilcox_log2_res_patient$FDR < 0.05, na.rm = TRUE), "\n")
+}
+
+# ANALYSIS 3: Wilcoxon tests on Patient-Level Data (Non-log2)
+cat("\n--- Analysis 3: Wilcoxon tests on Patient-Level Data (Non-log2) ---\n")
+
+wilcox_res_patient <- lapply(seq_along(acr_0_1r_patient), function(i) {
+  
+  group1 <- acr_0_1r_patient[[i]]
+  group2 <- acr_2r_patient[[i]]
+  
+  # Check for sufficient data
+  if(length(group1) < 3 | length(group2) < 3) {
+    return(NULL)
+  }
+  
+  median1 <- median(group1, na.rm = TRUE)
+  median2 <- median(group2, na.rm = TRUE)
+  median_diff <- median2 - median1
+  wilcox_test <- wilcox.test(group1, group2)
+  
+  tibble(
+    Metabolite = colnames(acr_0_1r_patient)[i],
+    Median_No_2R = median1,
+    Median_Has_2R = median2,
+    median_diff = median_diff,
+    p_value = wilcox_test$p.value,
+    n_no_2R = length(group1),
+    n_has_2R = length(group2)
+  )
+})
+
+wilcox_res_patient <- bind_rows(wilcox_res_patient[!sapply(wilcox_res_patient, is.null)])
+
+if(nrow(wilcox_res_patient) > 0) {
+  wilcox_res_patient <- wilcox_res_patient %>%
+    mutate(FDR = p.adjust(p_value, method = "BH"))
+  
+  cat("Patient-level Wilcoxon (non-log2) results:\n")
+  cat("Total metabolites tested:", nrow(wilcox_res_patient), "\n")
+  cat("Significant metabolites (p < 0.05):", sum(wilcox_res_patient$p_value < 0.05, na.rm = TRUE), "\n")
+  cat("Significant metabolites (FDR < 0.05):", sum(wilcox_res_patient$FDR < 0.05, na.rm = TRUE), "\n")
+}
+
+#=== EXPORT RESULTS ===
+
+cat("\n=== EXPORTING ALL PATIENT-LEVEL RESULTS ===\n")
+
+# Export individual statistical results
+if(exists("ttest_res_patient")) {
+  write_csv(ttest_res_patient, paste0(results_dir, "TTest_Results.csv"))
+  cat("Exported patient-level t-test results\n")
+}
+
+if(exists("wilcox_log2_res_patient")) {
+  write_csv(wilcox_log2_res_patient, paste0(results_dir, "WilcoxonLog2_Results.csv"))
+  cat("Exported patient-level Wilcoxon log2 results\n")
+}
+
+if(exists("wilcox_res_patient")) {
+  write_csv(wilcox_res_patient, paste0(results_dir, "WilcoxonNonLog2_Results.csv"))
+  cat("Exported patient-level Wilcoxon non-log2 results\n")
+}
+
+# Export patient aggregated data for reference
+write_csv(patient_aggregated, paste0(results_dir, "Aggregated_Data.csv"))
+cat("Exported patient-level aggregated dataset\n")
+
+cat("\n=== PATIENT-LEVEL ANALYSIS COMPLETE ===\n")
+cat("Check the Results/PatientLevel folder for exported results\n")
+cat("This analysis compares patients who never had 2R+ vs patients who had at least one 2R+ episode\n")
+cat("Each patient contributes one data point (median across all their samples)\n")

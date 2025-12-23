@@ -18,54 +18,9 @@ invisible(capture.output({
   # Source plotting functions  
   source("Immunosuppressive metabolites feature table/Scripts/03_plotting_functions")
   
-  # Temporarily disable ALL plotting, output and file functions
-  plot_ttest_bars_original <- if(exists("plot_ttest_bars")) plot_ttest_bars else NULL
-  ggsave_original <- ggsave
-  print_ggplot_original <- if(exists("print.ggplot")) print.ggplot else NULL
-  print_original <- print
-  cat_original <- cat
-  message_original <- message
-  warning_original <- warning
-  
-  # Override ALL output functions to do nothing
-  plot_ttest_bars <- function(...) { return(list()) }
-  assign("ggsave", function(...) { invisible(NULL) }, envir = .GlobalEnv)
-  assign("print.ggplot", function(...) { invisible(NULL) }, envir = .GlobalEnv)
-  assign("print", function(...) { invisible(NULL) }, envir = .GlobalEnv)
-  assign("cat", function(...) { invisible(NULL) }, envir = .GlobalEnv)
-  assign("message", function(...) { invisible(NULL) }, envir = .GlobalEnv)
-  assign("warning", function(...) { invisible(NULL) }, envir = .GlobalEnv)
-  
-  # Also disable any device functions
-  png_original <- png
-  pdf_original <- pdf
-  jpeg_original <- jpeg
-  assign("png", function(...) { invisible(NULL) }, envir = .GlobalEnv)
-  assign("pdf", function(...) { invisible(NULL) }, envir = .GlobalEnv)
-  assign("jpeg", function(...) { invisible(NULL) }, envir = .GlobalEnv)
-  
-  # Additional suppression - redirect all output to null
-  old_options <- options()
-  options(warn = -1)  # Suppress warnings
-  
   # Run all analyses silently (data only, no outputs)
-  suppressMessages(suppressWarnings({
-    source("Immunosuppressive metabolites feature table/Scripts/03_tests")
-    source("Immunosuppressive metabolites feature table/Scripts/04_PODdist")
-  }))
-  
-  # Restore ALL original functions and options
-  if(!is.null(plot_ttest_bars_original)) plot_ttest_bars <- plot_ttest_bars_original
-  assign("ggsave", ggsave_original, envir = .GlobalEnv)
-  if(!is.null(print_ggplot_original)) assign("print.ggplot", print_ggplot_original, envir = .GlobalEnv)
-  assign("print", print_original, envir = .GlobalEnv)
-  assign("cat", cat_original, envir = .GlobalEnv)
-  assign("message", message_original, envir = .GlobalEnv)
-  assign("warning", warning_original, envir = .GlobalEnv)
-  assign("png", png_original, envir = .GlobalEnv)
-  assign("pdf", pdf_original, envir = .GlobalEnv)
-  assign("jpeg", jpeg_original, envir = .GlobalEnv)
-  options(old_options)  # Restore original options
+  source("Immunosuppressive metabolites feature table/Scripts/03_tests")
+  source("Immunosuppressive metabolites feature table/Scripts/04_PODdist")
 
 }))
 sink()
@@ -75,8 +30,7 @@ sink()
 # - acr_0r, acr_1r, acr_0_1r, acr_2r
 # - pre_2R, active_2R, post_2R  
 # - ttest_res, ttest_res_median, etc.
-# All matched analysis results
-# All POD analysis objects
-# - All statistical analysis results (without plots/files)
+# - All matched analysis results
+# - All POD analysis objects
 
 cat("Analysis data loaded silently. All objects available in environment.\n")

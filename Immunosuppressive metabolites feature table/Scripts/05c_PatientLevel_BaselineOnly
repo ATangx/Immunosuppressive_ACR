@@ -1,0 +1,336 @@
+#=== PATIENT-LEVEL ANALYSIS: BASELINE SAMPLES ONLY (0R/1R) ===
+#! Compares patients using ONLY their 0R/1R samples (excluding 2R+ samples)
+#! Groups: patients who never had 2R+ vs patients who eventually had 2R+
+#! Focus: baseline metabolic differences that may predict future severe rejection
+
+
+cat("\n=== PATIENT-LEVEL BASELINE METABOLITE ANALYSIS ===\n")
+cat("Performing patient-level analysis using ONLY 0R/1R samples\n")
+cat("Rationale: Compare baseline metabolic states between patients who will vs won't develop severe rejection\n")
+cat("Each patient contributes one aggregated data point from their 0R/1R samples only\n\n")
+
+# Source all required data and plotting functions
+source("../Scripts/00_source")
+
+#=== PATIENT-LEVEL DATA PREPARATION ===
+
+cat("=== PATIENT-LEVEL DATA PREPARATION (BASELINE SAMPLES ONLY) ===\n")
+
+# First, identify patients who ever had 2R+ to create patient-level grouping
+patient_2r_status <- nonlog2_data %>%
+  group_by(H) %>%
+  summarise(
+    ACR_has_2R = any(grepl("^2R", ACR, ignore.case = TRUE)),
+    .groups = "drop"
+  )
+
+# Filter to only 0R/1R samples for ALL patients
+baseline_samples <- nonlog2_data %>%
+  filter(grepl("^[01]R", ACR, ignore.case = TRUE))
+
+cat("Sample filtering:\n")
+cat("Total original samples:", nrow(nonlog2_data), "\n")
+cat("0R/1R samples retained:", nrow(baseline_samples), "\n")
+cat("2R+ samples excluded:", nrow(nonlog2_data) - nrow(baseline_samples), "\n")
+
+# Check that we have baseline samples for analysis
+if(nrow(baseline_samples) == 0) {
+  stop("No 0R/1R samples found for analysis")
+}
+
+# Aggregate baseline samples to patient level using median values
+cat("\nAggregating baseline samples to patient level using median values...\n")
+
+# Get metabolite columns (exclude metadata columns)
+metadata_cols <- c("H", "POD", "S", "Sample_ID", "ACR")
+metabolite_cols <- setdiff(names(select_if(baseline_samples, is.numeric)), metadata_cols)
+
+cat("Identified", length(metabolite_cols), "metabolite columns for analysis\n")
+cat("First 5 metabolites:", head(metabolite_cols, 5), "\n")
+
+patient_baseline_aggregated <- baseline_samples %>%
+  group_by(H) %>%
+  summarise(
+    across(all_of(metabolite_cols), ~ median(.x, na.rm = TRUE)),
+    POD_min = min(POD, na.rm = TRUE),
+    POD_max = max(POD, na.rm = TRUE),
+    POD_median = median(POD, na.rm = TRUE),
+    n_baseline_samples = n(),
+    .groups = "drop"
+  ) %>%
+  # Add the 2R+ status information
+  left_join(patient_2r_status, by = "H")
+
+cat("Patient-level baseline aggregation complete:\n")
+cat("Total patients with baseline samples:", nrow(patient_baseline_aggregated), "\n")
+cat("Patients who never had 2R+ rejection:", sum(!patient_baseline_aggregated$ACR_has_2R), "\n")
+cat("Patients who eventually had 2R+ rejection:", sum(patient_baseline_aggregated$ACR_has_2R), "\n")
+
+# Check for sufficient sample sizes
+if(sum(!patient_baseline_aggregated$ACR_has_2R) < 3 | sum(patient_baseline_aggregated$ACR_has_2R) < 3) {
+  stop("Insufficient patients per group for analysis (need ≥3 each)")
+}
+
+# Create patient-level groups for analysis (remove metadata columns)
+acr_never_2r_patient <- patient_baseline_aggregated %>%
+  filter(!ACR_has_2R) %>%
+  select(all_of(metabolite_cols))  # Only metabolite columns
+
+acr_eventual_2r_patient <- patient_baseline_aggregated %>%
+  filter(ACR_has_2R) %>%
+  select(all_of(metabolite_cols))  # Only metabolite columns
+
+cat("Final groups for analysis:\n")
+cat("Never 2R+ group:", nrow(acr_never_2r_patient), "patients\n")
+cat("Eventual 2R+ group:", nrow(acr_eventual_2r_patient), "patients\n\n")
+
+#=== STATISTICAL TESTING ===
+
+cat("=== STATISTICAL TESTING (BASELINE PATIENT-LEVEL) ===\n")
+
+# Create results directory
+results_dir <- "Immunosuppressive metabolites feature table/Results/PatientLevel_5c_BaselineOnly"
+if (!dir.exists(results_dir)) {
+  dir.create(results_dir, recursive = TRUE)
+}
+
+# Initialize results storage
+patient_baseline_results <- data.frame(
+  Metabolite = character(),
+  Test = character(),
+  p_value = numeric(),
+  effect_size = numeric(),
+  never_2R_median = numeric(),
+  never_2R_IQR = character(),
+  eventual_2R_median = numeric(),
+  eventual_2R_IQR = character(),
+  significant = logical(),
+  stringsAsFactors = FALSE
+)
+
+# Get metabolite columns
+metabolite_test_cols <- names(acr_never_2r_patient)  # Already filtered to metabolites only
+n_metabolites <- length(metabolite_test_cols)
+
+cat("Testing", n_metabolites, "metabolites using baseline samples only...\n")
+
+# Progress tracking
+progress_interval <- max(1, floor(n_metabolites / 10))
+
+for (i in seq_along(metabolite_test_cols)) {
+  metabolite <- metabolite_test_cols[i]
+  
+  # Progress indicator
+  if (i %% progress_interval == 0 || i == n_metabolites) {
+    cat(sprintf("Progress: %d/%d metabolites (%.0f%%)\n", 
+                i, n_metabolites, (i/n_metabolites)*100))
+  }
+  
+  # Extract data for current metabolite
+  never_2r_values <- acr_never_2r_patient[[metabolite]]
+  eventual_2r_values <- acr_eventual_2r_patient[[metabolite]]
+  
+  # Remove missing values
+  never_2r_clean <- never_2r_values[!is.na(never_2r_values)]
+  eventual_2r_clean <- eventual_2r_values[!is.na(eventual_2r_values)]
+  
+  # Skip if insufficient data
+  if (length(never_2r_clean) < 3 || length(eventual_2r_clean) < 3) {
+    next
+  }
+  
+  # Wilcoxon rank-sum test (appropriate for patient-level data)
+  test_result <- wilcox.test(never_2r_clean, eventual_2r_clean)
+  
+  # Effect size (rank-biserial correlation)
+  effect_size <- 1 - (2 * test_result$statistic) / (length(never_2r_clean) * length(eventual_2r_clean))
+  
+  # Descriptive statistics
+  never_2r_median <- median(never_2r_clean)
+  never_2r_q1 <- quantile(never_2r_clean, 0.25)
+  never_2r_q3 <- quantile(never_2r_clean, 0.75)
+  never_2r_iqr <- sprintf("%.2f-%.2f", never_2r_q1, never_2r_q3)
+  
+  eventual_2r_median <- median(eventual_2r_clean)
+  eventual_2r_q1 <- quantile(eventual_2r_clean, 0.25)
+  eventual_2r_q3 <- quantile(eventual_2r_clean, 0.75)
+  eventual_2r_iqr <- sprintf("%.2f-%.2f", eventual_2r_q1, eventual_2r_q3)
+  
+  # Store results
+  patient_baseline_results <- rbind(patient_baseline_results, data.frame(
+    Metabolite = metabolite,
+    Test = "Wilcoxon",
+    p_value = test_result$p.value,
+    effect_size = effect_size,
+    never_2R_median = never_2r_median,
+    never_2R_IQR = never_2r_iqr,
+    eventual_2R_median = eventual_2r_median,
+    eventual_2R_IQR = eventual_2r_iqr,
+    significant = test_result$p.value < 0.1,
+    stringsAsFactors = FALSE
+  ))
+}
+
+# Apply multiple testing correction
+patient_baseline_results$p_adjusted <- p.adjust(patient_baseline_results$p_value, method = "fdr")
+patient_baseline_results$significant_adj <- patient_baseline_results$p_adjusted < 0.1
+
+# Sort by p-value
+patient_baseline_results <- patient_baseline_results[order(patient_baseline_results$p_value), ]
+
+# Summary statistics
+cat("\n=== ANALYSIS SUMMARY (BASELINE PATIENT-LEVEL) ===\n")
+cat("Total metabolites tested:", nrow(patient_baseline_results), "\n")
+cat("Nominally significant (p < 0.1):", sum(patient_baseline_results$significant), "\n")
+cat("FDR-corrected significant (q < 0.1):", sum(patient_baseline_results$significant_adj), "\n")
+
+if (sum(patient_baseline_results$significant) > 0) {
+  cat("\nTop nominally significant results:\n")
+  top_results <- head(patient_baseline_results[patient_baseline_results$significant, ], 10)
+  print(top_results[, c("Metabolite", "Test", "p_value", "effect_size", "never_2R_median", "eventual_2R_median")])
+}
+
+if (sum(patient_baseline_results$significant_adj) > 0) {
+  cat("\nFDR-corrected significant results:\n")
+  fdr_results <- patient_baseline_results[patient_baseline_results$significant_adj, ]
+  print(fdr_results[, c("Metabolite", "Test", "p_value", "p_adjusted", "effect_size", "never_2R_median", "eventual_2R_median")])
+}
+
+#=== EXPORT RESULTS ===
+
+cat("\n=== EXPORTING RESULTS ===\n")
+
+# Export comprehensive results table
+results_file <- file.path(results_dir, "patient_baseline_analysis_results.csv")
+write.csv(patient_baseline_results, results_file, row.names = FALSE)
+cat("Results exported to:", results_file, "\n")
+
+# Export significant results only
+if (sum(patient_baseline_results$significant) > 0) {
+  sig_results_file <- file.path(results_dir, "patient_baseline_significant_results.csv")
+  significant_results <- patient_baseline_results[patient_baseline_results$significant, ]
+  write.csv(significant_results, sig_results_file, row.names = FALSE)
+  cat("Significant results exported to:", sig_results_file, "\n")
+}
+
+#=== VISUALIZATION ===
+
+cat("\n=== CREATING VISUALIZATIONS ===\n")
+
+# Create plots for significant metabolites
+if (sum(patient_baseline_results$significant) > 0) {
+  
+  # Get significant metabolites (limit to top 20 for readability)
+  sig_metabolites <- head(patient_baseline_results[patient_baseline_results$significant, "Metabolite"], 20)
+  
+  cat("Creating plots for", length(sig_metabolites), "significant metabolites...\n")
+  
+  for (metabolite in sig_metabolites) {
+    
+    # Extract data for plotting
+    never_2r_values <- acr_never_2r_patient[[metabolite]]
+    eventual_2r_values <- acr_eventual_2r_patient[[metabolite]]
+    
+    # Remove missing values
+    never_2r_clean <- never_2r_values[!is.na(never_2r_values)]
+    eventual_2r_clean <- eventual_2r_values[!is.na(eventual_2r_values)]
+    
+    # Skip if insufficient data
+    if (length(never_2r_clean) < 3 || length(eventual_2r_clean) < 3) {
+      next
+    }
+    
+    # Get p-value for this metabolite
+    p_val <- patient_baseline_results[patient_baseline_results$Metabolite == metabolite, "p_value"]
+    
+    # Create combined data for plotting
+    plot_data <- data.frame(
+      value = c(never_2r_clean, eventual_2r_clean),
+      group = factor(c(
+        rep("Never 2R+", length(never_2r_clean)),
+        rep("Eventual 2R+", length(eventual_2r_clean))
+      ), levels = c("Never 2R+", "Eventual 2R+"))
+    )
+    
+    # Create boxplot using ggplot2
+    plot_file <- file.path(results_dir, paste0(gsub("[^A-Za-z0-9]", ".", metabolite), "_baseline_patient.png"))
+    
+    # Create boxplot
+    library(ggplot2)
+    p <- ggplot(plot_data, aes(x = group, y = value, fill = group)) +
+      geom_boxplot(alpha = 0.7) +
+      geom_jitter(width = 0.2, alpha = 0.6) +
+      scale_fill_manual(values = c("Never 2R+" = "lightblue", "Eventual 2R+" = "lightcoral")) +
+      labs(
+        title = paste("Baseline Patient-Level Analysis:", metabolite),
+        subtitle = paste("Wilcoxon test, p =", format(p_val, digits = 3)),
+        x = "Patient Group (based on baseline samples)",
+        y = paste("Median", metabolite, "(Patient Level)"),
+        fill = "Group"
+      ) +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5, size = 10),
+        legend.position = "none"
+      )
+    
+    # Save plot
+    ggsave(plot_file, p, width = 8, height = 6, dpi = 300)
+    cat("Created plot:", basename(plot_file), "\n")
+  }
+  
+  cat("Individual metabolite plots created\n")
+  
+  # Create summary volcano plot if there are enough results
+  if (nrow(patient_baseline_results) >= 10) {
+    
+    # Prepare data for volcano plot
+    volcano_data <- patient_baseline_results %>%
+      mutate(
+        neg_log10_p = -log10(p_value),
+        log2_fc = log2(eventual_2R_median / never_2R_median),
+        significant = p_value < 0.1 & abs(log2_fc) > log2(1.5)  # p < 0.1 and FC > 1.5
+      )
+    
+    # Remove infinite or NA values
+    volcano_data <- volcano_data[is.finite(volcano_data$neg_log10_p) & is.finite(volcano_data$log2_fc), ]
+    
+    if (nrow(volcano_data) > 0) {
+      library(ggplot2)
+      volcano_plot <- ggplot(volcano_data, aes(x = log2_fc, y = neg_log10_p)) +
+        geom_point(aes(color = significant), alpha = 0.6, size = 2) +
+        scale_color_manual(values = c("FALSE" = "grey60", "TRUE" = "red")) +
+        geom_hline(yintercept = -log10(0.1), linetype = "dashed", color = "blue") +
+        geom_vline(xintercept = c(-log2(1.5), log2(1.5)), linetype = "dashed", color = "blue") +
+        labs(
+          title = "Baseline Patient-Level Analysis: Volcano Plot",
+          subtitle = "Eventual 2R+ vs Never 2R+ (baseline samples only)",
+          x = "Log2 Fold Change (Eventual 2R+ / Never 2R+)",
+          y = "-Log10(p-value)",
+          color = "Significant\n(p < 0.1 & |FC| > 1.5)"
+        ) +
+        theme_minimal() +
+        theme(
+          legend.position = "bottom",
+          plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+          plot.subtitle = element_text(hjust = 0.5, size = 12)
+        )
+      
+      volcano_file <- file.path(results_dir, "baseline_patient_volcano_plot.png")
+      ggsave(volcano_file, volcano_plot, width = 10, height = 8, dpi = 300)
+      cat("Volcano plot created:", volcano_file, "\n")
+    } else {
+      cat("No valid data for volcano plot\n")
+    }
+  }
+  
+} else {
+  cat("No significant results found for visualization\n")
+}
+
+cat("\n=== BASELINE PATIENT-LEVEL ANALYSIS COMPLETE ===\n")
+cat("Results saved in:", results_dir, "\n")
+cat("Analysis approach: Used only 0R/1R samples from all patients\n")
+cat("Grouping: Never 2R+ vs Eventual 2R+ (based on entire patient history)\n")
+cat("Clinical interpretation: Baseline metabolic differences that may predict future severe rejection\n\n")

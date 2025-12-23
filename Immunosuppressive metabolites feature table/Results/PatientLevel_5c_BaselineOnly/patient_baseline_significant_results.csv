@@ -1,0 +1,2 @@
+"Metabolite","Test","p_value","effect_size","never_2R_median","never_2R_IQR","eventual_2R_median","eventual_2R_IQR","significant","p_adjusted","significant_adj"
+"Hydrocortisone.sodium.succinate..HILIC.","Wilcoxon",0.0906350146925326,-0.288084464555053,34622.9,"28501.93-42916.65",29317.1,"25976.60-33594.60",TRUE,0.822794220342641,FALSE

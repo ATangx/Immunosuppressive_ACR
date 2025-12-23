@@ -1,0 +1,10 @@
+Analysis_Group,Stratum,TTest_Total,TTest_Sig_P005,TTest_Sig_FDR005,WilcoxLog2_Total,WilcoxLog2_Sig_P005,WilcoxLog2_Sig_FDR005,WilcoxNonLog2_Total,WilcoxNonLog2_Sig_P005,WilcoxNonLog2_Sig_FDR005,PatientLevel_Total,PatientLevel_Sig_P005,PatientLevel_Sig_FDR005
+Median,Above Median,14,1,0,14,0,0,14,0,0,14,1,0
+Median,Below Median,14,1,0,14,1,0,14,1,0,14,2,0
+Predefined,Early (≤30 days),14,0,0,14,0,0,14,0,0,14,0,0
+Predefined,Late (91-180 days),14,1,0,14,0,0,14,0,0,14,1,0
+Predefined,Medium (31-90 days),14,1,0,14,0,0,14,0,0,NA,NA,NA
+Quartile,Q1 (Earliest),14,0,0,14,0,0,14,0,0,14,1,0
+Quartile,Q2 (Early-Med),14,0,0,14,0,0,14,0,0,14,0,0
+Quartile,Q3 (Med-Late),14,1,0,14,0,0,14,0,0,NA,NA,NA
+Quartile,Q4 (Latest),14,1,0,14,0,0,14,0,0,14,1,0

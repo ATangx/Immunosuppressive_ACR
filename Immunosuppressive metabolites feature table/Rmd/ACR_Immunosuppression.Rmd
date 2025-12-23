@@ -1,0 +1,50 @@
+---
+title: "ACR Immunosuppression Metabolites Analysis"
+output: html_document
+author: "Ailin Tang"
+date: "2025-12-23"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r load-source, results='hide', message=FALSE, warning=FALSE, include=FALSE}
+# Set working directory FIRST
+knitr::opts_knit$set(root.dir = here::here())
+options(width = 80)
+
+# Then load the source script completely silently
+invisible(capture.output({
+  suppressMessages(suppressWarnings({
+    source("Immunosuppressive metabolites feature table/Scripts/00_source")
+  }))
+}, type = c("output", "message")))
+```
+
+# Load Source Script
+This includes all library imports, data imports/setup/cleaning, and plot functions.
+The data has been set up to filter to only patients who have had at least one "2R+" ACR event.
+ACR status variables have been defined in the source script as well for 1)non-log2 data visualizations, 2)log2 statistical analyses, and 3)classification of pre-2R, active-2R, post-2R samples arranged by POD
+
+```{r load-source}
+source("Immunosuppressive metabolites feature table/Scripts/00_source")
+```
+
+# Patient-Level Analysis of Immunosuppressive Metabolites
+
+## In ALL patients, compare patients who NEVER had 2R+ vs patients who HAD at least one 2R+ episode (using all patients in the dataset)
+```{r}
+
+
+```
+
+### In ALL patients, compare NEVER 2R+ vs HAD 2R+ but exclude samples taken during active 2R+ episodes and post-2R+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Source the script
+source("Immunosuppressive metabolites feature table/Scripts/05c_PatientLevel_BaselineOnly")
+
+# Display the volcano plot
+knitr::include_graphics("Immunosuppressive metabolites feature table/Results/PatientLevel_5c_BaselineOnly/baseline_patient_volcano_plot.png")
+```
+
+## Within patients who experienced rejection (at least one event of "2R+"), compare pre-2R vs post-2R samples (0R/1R samples vs 2R+ samples)
