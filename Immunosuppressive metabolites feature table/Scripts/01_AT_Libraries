@@ -1,0 +1,19 @@
+# Load all libraries needed, run all at once if possible
+
+# Load entire tidyverse at once (includes dplyr, tibble, readr, tidyr, ggplot2, purrr, stringr, forcats)
+suppressPackageStartupMessages({
+  library(tidyverse)
+})
+
+# Individual packages (now loaded via tidyverse above):
+# library(dplyr)          # Data manipulation (mutate, filter, select, etc.)
+# library(tibble)         # Modern data frames (as_tibble)  
+# library(readr)          # Reading CSV files (read_csv)
+# library(tidyr)          # Data reshaping
+# library(ggplot2)        # Data visualization
+# library(purrr)          # Functional programming
+# library(stringr)        # String manipulation
+# library(forcats)        # Factor handling
+
+# Check if packages loaded successfully
+cat("Libraries loaded successfully!\n")
