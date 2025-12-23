@@ -1,0 +1,207 @@
+# Plotting functions for test results
+# This file contains enhanced plotting functions for metabolomics analysis
+
+#=== ENHANCED BAR PLOTTING FUNCTION ===
+
+plot_enhanced_bars <- function(sig_results, group1_data, group2_data, 
+                               use_median = TRUE, analysis_level = "Sample-Level", 
+                               test_type = "Wilcoxon") {
+  
+
+  
+  plot_list <- list()
+  
+  for (i in 1:nrow(sig_results)) {
+    metabolite <- sig_results$Metabolite[i]
+    p_val <- sig_results$p_value[i]
+    
+    # Get data for this metabolite
+    if (metabolite %in% names(group1_data) && metabolite %in% names(group2_data)) {
+      group1_values <- group1_data[[metabolite]]
+      group2_values <- group2_data[[metabolite]]
+      
+      # Remove NA values
+      group1_clean <- group1_values[!is.na(group1_values)]
+      group2_clean <- group2_values[!is.na(group2_values)]
+      
+      if (length(group1_clean) > 0 && length(group2_clean) > 0) {
+        
+        # Create combined data for plotting
+        plot_data <- data.frame(
+          value = c(group1_clean, group2_clean),
+          group = factor(c(
+            rep("0R/1R", length(group1_clean)),
+            rep("2R+", length(group2_clean))
+          ), levels = c("0R/1R", "2R+"))
+        )
+        
+        # Calculate statistics for display
+        if (use_median) {
+          stat1 <- median(group1_clean)
+          stat2 <- median(group2_clean)
+          stat_label <- "Median"
+        } else {
+          stat1 <- mean(group1_clean)
+          stat2 <- mean(group2_clean)
+          stat_label <- "Mean"
+        }
+        
+        # Create the plot
+        p <- ggplot(plot_data, aes(x = group, y = value, fill = group)) +
+          geom_boxplot(alpha = 0.7, outlier.alpha = 0.5) +
+          geom_jitter(width = 0.2, alpha = 0.6, size = 1.5) +
+          scale_fill_manual(values = c("0R/1R" = "lightblue", "2R+" = "lightcoral")) +
+          labs(
+            title = paste(analysis_level, "Analysis:", metabolite),
+            subtitle = paste0(test_type, " test, p = ", format(p_val, digits = 3),
+                             "\n", stat_label, " 0R/1R = ", round(stat1, 2),
+                             ", ", stat_label, " 2R+ = ", round(stat2, 2)),
+            x = "ACR Grade",
+            y = paste(metabolite, "Concentration"),
+            fill = "Group"
+          ) +
+          theme_minimal() +
+          theme(
+            plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+            plot.subtitle = element_text(hjust = 0.5, size = 10),
+            legend.position = "none",
+            axis.text = element_text(size = 10),
+            axis.title = element_text(size = 11)
+          )
+        
+        # Add significance annotation
+        y_max <- max(plot_data$value, na.rm = TRUE)
+        y_pos <- y_max * 1.1
+        
+        if (p_val < 0.001) {
+          sig_text <- "***"
+        } else if (p_val < 0.01) {
+          sig_text <- "**"
+        } else if (p_val < 0.05) {
+          sig_text <- "*"
+        } else if (p_val < 0.1) {
+          sig_text <- "."
+        } else {
+          sig_text <- "ns"
+        }
+        
+        p <- p + 
+          annotate("text", x = 1.5, y = y_pos, label = sig_text, size = 6) +
+          annotate("segment", x = 1, xend = 2, y = y_pos * 0.95, yend = y_pos * 0.95)
+        
+        plot_list[[metabolite]] <- p
+      }
+    }
+  }
+  
+  return(plot_list)
+}
+
+#=== LEGACY PLOTTING FUNCTION (FALLBACK) ===
+
+plot_ttest_bars <- function(sig_results, group1_data, group2_data, use_median = TRUE) {
+  
+  plot_list <- list()
+  
+  for (i in 1:nrow(sig_results)) {
+    metabolite <- sig_results$Metabolite[i]
+    p_val <- sig_results$p_value[i]
+    
+    # Get data for this metabolite
+    if (metabolite %in% names(group1_data) && metabolite %in% names(group2_data)) {
+      group1_values <- group1_data[[metabolite]]
+      group2_values <- group2_data[[metabolite]]
+      
+      # Remove NA values
+      group1_clean <- group1_values[!is.na(group1_values)]
+      group2_clean <- group2_values[!is.na(group2_values)]
+      
+      if (length(group1_clean) > 0 && length(group2_clean) > 0) {
+        
+        # Create summary data
+        if (use_median) {
+          summary_data <- data.frame(
+            Group = c("0R/1R", "2R+"),
+            Value = c(median(group1_clean), median(group2_clean)),
+            SE = c(mad(group1_clean)/sqrt(length(group1_clean)), 
+                   mad(group2_clean)/sqrt(length(group2_clean)))
+          )
+        } else {
+          summary_data <- data.frame(
+            Group = c("0R/1R", "2R+"),
+            Value = c(mean(group1_clean), mean(group2_clean)),
+            SE = c(sd(group1_clean)/sqrt(length(group1_clean)), 
+                   sd(group2_clean)/sqrt(length(group2_clean)))
+          )
+        }
+        
+        # Create bar plot
+        p <- ggplot(summary_data, aes(x = Group, y = Value, fill = Group)) +
+          geom_bar(stat = "identity", alpha = 0.7) +
+          geom_errorbar(aes(ymin = Value - SE, ymax = Value + SE), 
+                        width = 0.2, size = 1) +
+          scale_fill_manual(values = c("0R/1R" = "lightblue", "2R+" = "lightcoral")) +
+          labs(
+            title = paste("Metabolite:", metabolite),
+            subtitle = paste("p =", format(p_val, digits = 3)),
+            x = "ACR Grade",
+            y = paste(metabolite, "Level"),
+            fill = "Group"
+          ) +
+          theme_minimal() +
+          theme(
+            plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+            plot.subtitle = element_text(hjust = 0.5, size = 9),
+            legend.position = "none"
+          )
+        
+        plot_list[[metabolite]] <- p
+      }
+    }
+  }
+  
+  return(plot_list)
+}
+
+#=== VOLCANO PLOT FUNCTION ===
+
+create_volcano_plot <- function(results_data, title = "Volcano Plot", 
+                               p_threshold = 0.05, fc_threshold = 1.5) {
+  
+
+  
+  # Prepare data for volcano plot
+  volcano_data <- results_data %>%
+    mutate(
+      neg_log10_p = -log10(p_value),
+      log2_fc = log2(abs(median_diff) + 0.001),  # Add small constant to avoid log(0)
+      significant = p_value < p_threshold & abs(log2_fc) > log2(fc_threshold)
+    ) %>%
+    filter(is.finite(neg_log10_p) & is.finite(log2_fc))
+  
+  if (nrow(volcano_data) == 0) {
+    return(NULL)
+  }
+  
+  # Create volcano plot
+  p <- ggplot(volcano_data, aes(x = log2_fc, y = neg_log10_p)) +
+    geom_point(aes(color = significant), alpha = 0.6, size = 2) +
+    scale_color_manual(values = c("FALSE" = "grey60", "TRUE" = "red")) +
+    geom_hline(yintercept = -log10(p_threshold), linetype = "dashed", color = "blue") +
+    geom_vline(xintercept = log2(fc_threshold), linetype = "dashed", color = "blue") +
+    labs(
+      title = title,
+      x = "Log2 Fold Change",
+      y = "-Log10(p-value)",
+      color = paste0("Significant\n(p < ", p_threshold, ")")
+    ) +
+    theme_minimal() +
+    theme(
+      legend.position = "bottom",
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+    )
+  
+  return(p)
+}
+
+cat("Plotting functions loaded successfully.\n")

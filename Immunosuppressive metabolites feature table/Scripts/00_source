@@ -1,29 +1,40 @@
 # Source all analysis functions and data silently
 # This loads everything without prints, outputs, or document generation
 
-# Suppress all output during sourcing
-sink("/dev/null")
-invisible(capture.output({
+# BULLETPROOF SILENCING: Store original functions and override them
+suppressMessages(suppressWarnings(local({
   
-  # # Load libraries
-  # suppressPackageStartupMessages({
-  #   library(tidyverse)
-  # })
+  # Store original output functions
+  original_cat <- cat
+  original_print <- print
+  original_message <- message
+  original_warning <- warning
+  original_writeLines <- writeLines
   
-  source("Immunosuppressive metabolites feature table/Scripts/01_libraries")
+  # Override all output functions to do nothing
+  assign("cat", function(...) invisible(NULL), envir = .GlobalEnv)
+  assign("print", function(...) invisible(NULL), envir = .GlobalEnv)
+  assign("message", function(...) invisible(NULL), envir = .GlobalEnv)
+  assign("warning", function(...) invisible(NULL), envir = .GlobalEnv)
+  assign("writeLines", function(...) invisible(NULL), envir = .GlobalEnv)
   
-  # Source data setup (suppress prints)
-  source("Immunosuppressive metabolites feature table/Scripts/02_setup")
+  # Source all scripts with complete silence
+  invisible(capture.output({
+    source("Immunosuppressive metabolites feature table/Scripts/01_libraries")
+    source("Immunosuppressive metabolites feature table/Scripts/02_setup")
+    source("Immunosuppressive metabolites feature table/Scripts/03_plotting_functions")
+    source("Immunosuppressive metabolites feature table/Scripts/03_tests")
+    source("Immunosuppressive metabolites feature table/Scripts/04_PODdist")
+  }))
   
-  # Source plotting functions  
-  source("Immunosuppressive metabolites feature table/Scripts/03_plotting_functions")
+  # RESTORE original functions after sourcing is complete
+  assign("cat", original_cat, envir = .GlobalEnv)
+  assign("print", original_print, envir = .GlobalEnv)
+  assign("message", original_message, envir = .GlobalEnv)
+  assign("warning", original_warning, envir = .GlobalEnv)
+  assign("writeLines", original_writeLines, envir = .GlobalEnv)
   
-  # Run all analyses silently (data only, no outputs)
-  source("Immunosuppressive metabolites feature table/Scripts/03_tests")
-  source("Immunosuppressive metabolites feature table/Scripts/04_PODdist")
-
-}))
-sink()
+})))
 
 # All data objects are now available in environment:
 # - metabolite_data, nonlog2_data, patients_with_2R

@@ -18,11 +18,15 @@ cat("Aggregating data to patient level using median values...\n")
 cat("Using only patients with at least one 2R+ episode (same as 03_tests)...\n")
 
 # Replicate the exact logic from 03_tests lines 219-235
+# But fix the POD inclusion issue
+metadata_cols <- c("H", "POD", "S", "Sample_ID", "ACR")
+metabolite_cols <- setdiff(names(select_if(patients_with_2R, is.numeric)), metadata_cols)
+
 acr_0_1r_patient <- patients_with_2R %>%
   filter(ACR %in% c("0R", "1R")) %>%
   group_by(H) %>%
   summarise(
-    across(where(is.numeric), \(x) median(x, na.rm = TRUE)),
+    across(all_of(metabolite_cols), \(x) median(x, na.rm = TRUE)),
     .groups = "drop"
   )
 
@@ -30,7 +34,7 @@ acr_2r_patient <- patients_with_2R %>%
   filter(grepl("^2R", ACR, ignore.case = TRUE)) %>%
   group_by(H) %>%
   summarise(
-    across(where(is.numeric), \(x) median(x, na.rm = TRUE)),
+    across(all_of(metabolite_cols), \(x) median(x, na.rm = TRUE)),
     .groups = "drop"
   )
 
