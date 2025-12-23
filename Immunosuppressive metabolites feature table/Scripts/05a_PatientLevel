@@ -214,7 +214,3 @@ if(exists("wilcox_res_patient")) {
 write_csv(patient_aggregated, paste0(results_dir, "Aggregated_Data.csv"))
 cat("Exported patient-level aggregated dataset\n")
 
-cat("\n=== PATIENT-LEVEL ANALYSIS COMPLETE ===\n")
-cat("Check the Results2/PatientLevel folder for exported results\n")
-cat("This analysis compares patients who never had 2R+ vs patients who had at least one 2R+ episode\n")
-cat("Each patient contributes one data point (median across all their samples)\n")

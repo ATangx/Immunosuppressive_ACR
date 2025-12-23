@@ -163,22 +163,4 @@ write_csv(acr_2r_patient, paste0(output_dir, "03TestsLogic_2R_PatientData.csv"))
 
 cat("Exported patient-level results using 03_tests logic\n")
 
-#=== SUMMARY COMPARISON ===
 
-cat("\n=== SUMMARY: COMPARISON OF TWO PATIENT-LEVEL APPROACHES ===\n")
-cat("1. 03_TESTS LOGIC (this script):\n")
-cat("   - Only patients with ≥1 2R+ episode included\n")
-cat("   - Compares 0R/1R vs 2R+ SAMPLES within those patients\n")
-cat("   - Question: Among patients who rejected, do metabolite levels differ by rejection grade?\n")
-cat("   - Patients with 0R/1R samples:", nrow(acr_0_1r_patient), "\n")
-cat("   - Patients with 2R+ samples:", nrow(acr_2r_patient), "\n")
-cat("   - Significant metabolites:", nrow(sig_mets_median_patient), "\n\n")
-
-cat("2. 05A_PATIENTLEVEL LOGIC:\n")
-cat("   - ALL patients included\n") 
-cat("   - Compares patients who NEVER had 2R+ vs patients who HAD ≥1 2R+ episode\n")
-cat("   - Question: Do baseline metabolite profiles predict rejection risk?\n")
-cat("   - This is the more clinically relevant comparison for biomarker discovery\n\n")
-
-cat("Both analyses are valid but answer different clinical questions!\n")
-cat("\n=== PATIENT-LEVEL ANALYSIS (03_TESTS LOGIC) COMPLETE ===\n")

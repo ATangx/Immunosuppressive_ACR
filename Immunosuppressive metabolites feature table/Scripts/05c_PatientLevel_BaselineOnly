@@ -4,11 +4,6 @@
 #! Focus: baseline metabolic differences that may predict future severe rejection
 
 
-cat("\n=== PATIENT-LEVEL BASELINE METABOLITE ANALYSIS ===\n")
-cat("Performing patient-level analysis using ONLY 0R/1R samples\n")
-cat("Rationale: Compare baseline metabolic states between patients who will vs won't develop severe rejection\n")
-cat("Each patient contributes one aggregated data point from their 0R/1R samples only\n\n")
-
 # Source all required data and plotting functions
 source("Immunosuppressive metabolites feature table/Scripts/00_source")
 
@@ -329,8 +324,4 @@ if (sum(patient_baseline_results$significant) > 0) {
   cat("No significant results found for visualization\n")
 }
 
-cat("\n=== BASELINE PATIENT-LEVEL ANALYSIS COMPLETE ===\n")
-cat("Results saved in:", results_dir, "\n")
-cat("Analysis approach: Used only 0R/1R samples from all patients\n")
-cat("Grouping: Never 2R+ vs Eventual 2R+ (based on entire patient history)\n")
-cat("Clinical interpretation: Baseline metabolic differences that may predict future severe rejection\n\n")
+
