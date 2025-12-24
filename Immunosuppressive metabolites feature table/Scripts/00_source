@@ -1,83 +1,26 @@
 # Source all analysis functions and data silently
 # This loads everything without prints, outputs, or document generation
 
-
-# No, this is definitely **not** the typical way! This is an extreme "nuclear option" approach because your scripts are generating so much unwanted output.
-
-# ## **Typical/Standard Approaches:**
-
-# ### **Normal R sourcing:**
-# ```r
-# source("script.R")
-# ```
-
-# ### **Standard suppression:**
-# ```r
-# suppressMessages(suppressWarnings(source("script.R")))
-# ```
-
-# ### **Quiet sourcing:**
-# ```r
-# invisible(capture.output(source("script.R")))
-# ```
-
-# ## **Why We Need the Extreme Approach:**
-
-# Your scripts are generating:
-# - **Cat statements** that bypass normal suppression
-# - **Viewer popups** from gtsummary tables
-# - **HTML outputs** that force display
-# - **Plot displays** that auto-show
-# - **Print statements** everywhere
-
-# ## **Better Long-Term Solution:**
-
-# The **proper way** would be to modify your individual scripts to:
-# 1. **Add `quiet = TRUE`** parameters to functions
-# 2. **Remove unnecessary `cat()` statements**
-# 3. **Use `invisible()` around plot creation**
-# 4. **Add `print = FALSE` to gtsummary functions**
-
-# But since you need it working **now** and don't want to edit 6+ scripts, the "nuclear option" is a pragmatic solution.
-
-# ## **Industry Standard:**
-# - **Well-written scripts** shouldn't need this level of suppression
-# - **Production code** typically has minimal console output
-# - **Analysis scripts** often have optional `verbose` parameters
-
-# So no, this isn't typical - it's a workaround for scripts that are overly "chatty" with their output.
-
-
-# Simple and reliable approach: capture all output and suppress messages/warnings
-invisible({
+# Simple suppression without sink - just capture cat() output
+{
+  old_cat <- cat
+  assign("cat", function(...) invisible(NULL), envir = .GlobalEnv)
+  
   suppressMessages(suppressWarnings({
-    # Temporarily disable viewer
-    old_viewer <- getOption("viewer")
-    options(viewer = NULL)
-    
-    # Also disable any plotting devices
-    if(dev.cur() > 1) dev.off()
-    
-    invisible(capture.output({
-      source("Immunosuppressive metabolites feature table/Scripts/01_libraries")
-      source("Immunosuppressive metabolites feature table/Scripts/02_setup")
-      source("Immunosuppressive metabolites feature table/Scripts/03a_plotting_functions")
-      source("Immunosuppressive metabolites feature table/Scripts/03b_tests_plot")
-      source("Immunosuppressive metabolites feature table/Scripts/03_tests")
-      source("Immunosuppressive metabolites feature table/Scripts/04_PODdist")
-    }, type = c("output", "message")))
-    
-    # Restore viewer
-    options(viewer = old_viewer)
+    source("Immunosuppressive metabolites feature table/Scripts/01_libraries")
+    source("Immunosuppressive metabolites feature table/Scripts/02_setup") 
+    source("Immunosuppressive metabolites feature table/Scripts/03a_plotting_functions")
+    source("Immunosuppressive metabolites feature table/Scripts/03b_tests_plot")
+    source("Immunosuppressive metabolites feature table/Scripts/03_tests")
   }))
-})
+  
+  assign("cat", old_cat, envir = .GlobalEnv)
+}
 
 # All data objects are now available in environment:
 # - metabolite_data, nonlog2_data, patients_with_2R
 # - acr_0r, acr_1r, acr_0_1r, acr_2r
 # - pre_2R, active_2R, post_2R  
-# - ttest_res, ttest_res_median, etc.
-# - All matched analysis results
-# - All POD analysis objects
+# - Analysis results from simplified scripts
 
-cat("Analysis data loaded silently. All objects available in environment.\n")
+cat("Analysis data loaded. All objects available.\n")

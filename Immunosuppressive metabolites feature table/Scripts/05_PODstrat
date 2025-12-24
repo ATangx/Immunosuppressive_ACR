@@ -3,35 +3,6 @@
 cat("\n=== POD-STRATIFIED METABOLITE ANALYSIS ===\n")
 cat("Performing Wilcoxon tests within each POD timepoint\n\n")
 
-# Source all required data and functions
-{
-  # Save original state
-  old_options <- options()
-  
-  # Nuclear suppression
-  options(
-    viewer = NULL,
-    warn = -1,
-    device = "nulldev"
-  )
-  
-  # Override output functions
-  cat <- function(...) invisible(NULL)
-  print <- function(...) invisible(NULL)
-  message <- function(...) invisible(NULL)
-  
-  # Source everything
-  source("Immunosuppressive metabolites feature table/Scripts/01_libraries")
-  source("Immunosuppressive metabolites feature table/Scripts/02_setup")
-  source("Immunosuppressive metabolites feature table/Scripts/03a_plotting_functions")
-  source("Immunosuppressive metabolites feature table/Scripts/03b_tests_plot")
-  source("Immunosuppressive metabolites feature table/Scripts/03_tests")
-  source("Immunosuppressive metabolites feature table/Scripts/04_PODdist")
-  
-  # Restore everything
-  options(old_options)
-  rm(cat, print, message)
-}
 
 # Define POD strata
 pod_quartiles <- quantile(patients_with_2R$POD, c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)

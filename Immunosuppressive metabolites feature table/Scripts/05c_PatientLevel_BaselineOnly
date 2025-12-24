@@ -4,9 +4,6 @@
 #! Focus: baseline metabolic differences that may predict future severe rejection
 
 
-# Source all required data and plotting functions
-source("Immunosuppressive metabolites feature table/Scripts/00_source")
-
 #=== PATIENT-LEVEL DATA PREPARATION ===
 
 cat("=== PATIENT-LEVEL DATA PREPARATION (BASELINE SAMPLES ONLY) ===\n")

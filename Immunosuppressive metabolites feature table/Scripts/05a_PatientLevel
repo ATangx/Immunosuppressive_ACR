@@ -4,8 +4,6 @@ cat("\n=== PATIENT-LEVEL METABOLITE ANALYSIS ===\n")
 cat("Performing patient-level analysis on entire dataset (no POD stratification)\n")
 cat("Each patient contributes one aggregated data point for statistical independence\n\n")
 
-# Source all required data and plotting functions
-source("Immunosuppressive metabolites feature table/Scripts/00_source")
 
 #=== PATIENT-LEVEL DATA PREPARATION ===
 

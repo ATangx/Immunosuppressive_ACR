@@ -3,9 +3,6 @@
 cat("\n=== POD-STRATIFIED METABOLITE PLOTTING ===\n")
 cat("Creating plots for POD-stratified significant results\n\n")
 
-#! Source all required data and functions
-
-
 # Define POD strata
 pod_strata <- list(
   "Early (≤30 days)" = c(0, 30),

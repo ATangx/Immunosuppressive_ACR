@@ -5,8 +5,6 @@ cat("Performing patient-level analysis ONLY on patients with at least one 2R+ ep
 cat("This matches the exact logic from the patient-level section in 03_tests\n")
 cat("Comparing 0R/1R samples vs 2R+ samples within patients who experienced rejection\n\n")
 
-# Source all required data and plotting functions
-source("Immunosuppressive metabolites feature table/Scripts/00_source")
 
 #=== PATIENT-LEVEL DATA PREPARATION (MATCHING 03_TESTS) ===
 
