@@ -1,0 +1,301 @@
+#=== PATIENT-LEVEL ANALYSIS STRATIFIED BY POD ===
+
+cat("\n=== PATIENT-LEVEL POD-STRATIFIED METABOLITE ANALYSIS ===\n")
+cat("Performing patient-level analysis within each POD timepoint\n")
+cat("Each patient contributes one aggregated data point within their POD stratum\n\n")
+
+# Source all required data and functions
+suppressMessages(suppressWarnings({
+  source("Immunosuppressive metabolites feature table/Scripts/00_source")
+}))
+
+# Define POD strata (reuse from existing scripts)
+pod_strata <- list(
+  "Early (≤30 days)" = c(0, 30),
+  "Medium (31-90 days)" = c(31, 90), 
+  "Late (91-180 days)" = c(91, 180),
+  "Very Late (>180 days)" = c(181, Inf)
+)
+
+pod_median <- median(patients_with_2R$POD, na.rm = TRUE)
+pod_strata_median <- list(
+  "Below Median POD" = c(0, pod_median),
+  "Above Median POD" = c(pod_median + 1, Inf)
+)
+
+# Get metabolite columns (reuse logic from 05a)
+metadata_cols <- c("H", "POD", "S", "Sample_ID", "ACR")
+metabolite_cols <- setdiff(names(select_if(nonlog2_data, is.numeric)), metadata_cols)
+
+cat("Identified", length(metabolite_cols), "metabolite columns for patient-level POD analysis\n\n")
+
+# Function to perform patient-level analysis within POD strata
+perform_patient_pod_analysis <- function(data, strata_list, analysis_name) {
+  
+  cat("=== ANALYSIS:", analysis_name, "===\n")
+  all_strata_results <- list()
+  
+  for(stratum_name in names(strata_list)) {
+    range_vals <- strata_list[[stratum_name]]
+    
+    cat("\n--- POD Stratum:", stratum_name, "(", range_vals[1], "to", 
+        ifelse(is.infinite(range_vals[2]), "max", range_vals[2]), "days) ---\n")
+    
+    # Filter data for this POD stratum
+    stratum_data <- data %>%
+      filter(POD >= range_vals[1] & POD <= range_vals[2])
+    
+    if(nrow(stratum_data) < 10) {
+      cat("Insufficient samples (n=", nrow(stratum_data), ") - skipping stratum\n")
+      next
+    }
+    
+    # Aggregate to patient level within this POD stratum
+    patient_aggregated_stratum <- stratum_data %>%
+      group_by(H) %>%
+      summarise(
+        across(all_of(metabolite_cols), ~ median(.x, na.rm = TRUE)),
+        ACR_has_2R = any(grepl("^2R", ACR, ignore.case = TRUE)),
+        POD_min = min(POD, na.rm = TRUE),
+        POD_max = max(POD, na.rm = TRUE),
+        .groups = "drop"
+      )
+    
+    cat("Patients in stratum:", nrow(patient_aggregated_stratum), "\n")
+    cat("Patients without 2R+:", sum(!patient_aggregated_stratum$ACR_has_2R), "\n")
+    cat("Patients with 2R+:", sum(patient_aggregated_stratum$ACR_has_2R), "\n")
+    
+    # Check if we have enough patients in each group
+    if(sum(!patient_aggregated_stratum$ACR_has_2R) < 3 | sum(patient_aggregated_stratum$ACR_has_2R) < 3) {
+      cat("Insufficient patients in one or both ACR groups - skipping statistical tests\n")
+      next
+    }
+    
+    # Create patient-level ACR groups
+    acr_never_2r_patient <- patient_aggregated_stratum %>%
+      filter(!ACR_has_2R) %>%
+      select(all_of(metabolite_cols))
+    
+    acr_ever_2r_patient <- patient_aggregated_stratum %>%
+      filter(ACR_has_2R) %>%
+      select(all_of(metabolite_cols))
+    
+    # Perform Wilcoxon tests on patient-level data
+    acr_never_2r_log2 <- acr_never_2r_patient %>% 
+      mutate(across(everything(), ~ log2(.x + 0.001)))
+    acr_ever_2r_log2 <- acr_ever_2r_patient %>% 
+      mutate(across(everything(), ~ log2(.x + 0.001)))
+    
+    patient_wilcox_results <- lapply(seq_along(acr_never_2r_log2), function(i) {
+      group1 <- acr_never_2r_log2[[i]]
+      group2 <- acr_ever_2r_log2[[i]]
+      wilcox_test <- wilcox.test(group1, group2)
+      tibble(
+        POD_Stratum = stratum_name,
+        Analysis_Type = analysis_name,
+        Metabolite = colnames(acr_never_2r_log2)[i],
+        Median_Never_2R = median(group1, na.rm = TRUE),
+        Median_Ever_2R = median(group2, na.rm = TRUE),
+        median_diff = median(group2, na.rm = TRUE) - median(group1, na.rm = TRUE),
+        p_value = wilcox_test$p.value,
+        n_never_2R = nrow(acr_never_2r_patient),
+        n_ever_2R = nrow(acr_ever_2r_patient)
+      )
+    })
+    patient_wilcox_results <- bind_rows(patient_wilcox_results) %>%
+      mutate(FDR = p.adjust(p_value, method = "BH"))
+    
+    # Report significant results
+    sig_results <- patient_wilcox_results %>% filter(p_value < 0.1)
+    cat("Significant results (p < 0.1):", nrow(sig_results), "out of", nrow(patient_wilcox_results), "\n")
+    
+    all_strata_results[[stratum_name]] <- patient_wilcox_results
+  }
+  
+  return(all_strata_results)
+}
+
+# Perform analyses
+results_predefined <- perform_patient_pod_analysis(patients_with_2R, pod_strata, "Predefined Time Periods")
+results_median <- perform_patient_pod_analysis(patients_with_2R, pod_strata_median, "Median Split")
+
+#=== PLOTTING SIGNIFICANT RESULTS ===
+
+cat("\n=== CREATING PLOTS FOR SIGNIFICANT PATIENT-LEVEL POD-STRATIFIED RESULTS ===\n")
+
+# Function to create plots for significant results within each stratum
+create_patient_pod_plots <- function(stratum_results, stratum_name, analysis_type) {
+  
+  # Filter for significant results
+  sig_results <- stratum_results %>% filter(p_value < 0.1)
+  
+  if(nrow(sig_results) == 0) {
+    return(0)
+  }
+  
+  plots_created <- 0
+  
+  for(i in 1:nrow(sig_results)) {
+    metabolite <- sig_results$Metabolite[i]
+    p_val <- sig_results$p_value[i]
+    
+    # Get the original POD stratum data for this metabolite
+    range_vals <- if(analysis_type == "Predefined Time Periods") {
+      pod_strata[[stratum_name]]
+    } else {
+      pod_strata_median[[stratum_name]]
+    }
+    
+    # Filter and aggregate patient data for this stratum
+    stratum_data <- patients_with_2R %>%
+      filter(POD >= range_vals[1] & POD <= range_vals[2])
+    
+    if(nrow(stratum_data) < 10) next
+    
+    patient_plot_data <- stratum_data %>%
+      group_by(H) %>%
+      summarise(
+        metabolite_value = median(.data[[metabolite]], na.rm = TRUE),
+        ACR_has_2R = any(grepl("^2R", ACR, ignore.case = TRUE)),
+        .groups = "drop"
+      ) %>%
+      filter(!is.na(metabolite_value)) %>%
+      mutate(
+        Group = ifelse(ACR_has_2R, "Ever 2R+", "Never 2R+")
+      )
+    
+    # Check if we have data for both groups
+    if(length(unique(patient_plot_data$Group)) < 2) next
+    
+    # Create plot
+    plot_title <- paste0("Patient-Level POD ", stratum_name, "\n", metabolite, " (p=", round(p_val, 3), ")")
+    plot_subtitle <- paste0("Patient-Level Analysis (", analysis_type, ")")
+    
+    p <- ggplot(patient_plot_data, aes(x = Group, y = metabolite_value, fill = Group)) +
+      geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+      geom_jitter(width = 0.2, alpha = 0.8, size = 2) +
+      labs(
+        title = plot_title,
+        subtitle = plot_subtitle,
+        y = paste("Patient-Level", metabolite, "(median across samples)"),
+        x = "Patient ACR Status"
+      ) +
+      theme_minimal() +
+      theme(
+        legend.position = "none",
+        plot.title = element_text(size = 12, hjust = 0.5),
+        plot.subtitle = element_text(size = 10, hjust = 0.5)
+      ) +
+      scale_fill_manual(values = c("Never 2R+" = "lightblue", "Ever 2R+" = "lightcoral"))
+    
+    # Add sample sizes to plot
+    n_never <- sum(patient_plot_data$Group == "Never 2R+")
+    n_ever <- sum(patient_plot_data$Group == "Ever 2R+")
+    p <- p + labs(caption = paste0("n(Never 2R+)=", n_never, ", n(Ever 2R+)=", n_ever))
+    
+    # Save plot
+    safe_stratum_name <- gsub("[^A-Za-z0-9]", "_", stratum_name)
+    safe_analysis_type <- gsub("[^A-Za-z0-9]", "_", analysis_type)
+    filename <- paste0("./Immunosuppressive metabolites feature table/Results2/", 
+                      "PatientLevel_POD_", safe_stratum_name, "_", metabolite, 
+                      "_", safe_analysis_type, "_Wilcoxon_plot.png")
+    
+    tryCatch({
+      ggsave(filename, plot = p, dpi = 300, width = 8, height = 6)
+      plots_created <- plots_created + 1
+    }, error = function(e) {
+      cat("Warning: Could not save plot for", metabolite, "in", stratum_name, "\n")
+    })
+  }
+  
+  return(plots_created)
+}
+
+# Create plots for all significant results
+total_plots <- 0
+
+# Plot predefined strata results
+if(length(results_predefined) > 0) {
+  for(stratum_name in names(results_predefined)) {
+    plots_created <- create_patient_pod_plots(results_predefined[[stratum_name]], 
+                                            stratum_name, "Predefined Time Periods")
+    total_plots <- total_plots + plots_created
+    if(plots_created > 0) {
+      cat("Created", plots_created, "plots for", stratum_name, "(Predefined)\n")
+    }
+  }
+}
+
+# Plot median split results  
+if(length(results_median) > 0) {
+  for(stratum_name in names(results_median)) {
+    plots_created <- create_patient_pod_plots(results_median[[stratum_name]], 
+                                            stratum_name, "Median Split")
+    total_plots <- total_plots + plots_created
+    if(plots_created > 0) {
+      cat("Created", plots_created, "plots for", stratum_name, "(Median Split)\n")
+    }
+  }
+}
+
+cat("Total patient-level POD-stratified plots created:", total_plots, "\n")
+
+#=== SUMMARY AND EXPORT ===
+
+cat("\n=== PATIENT-LEVEL POD-STRATIFIED SUMMARY ===\n")
+
+# Combine all results
+all_results <- list()
+if(length(results_predefined) > 0) {
+  all_results <- c(all_results, results_predefined)
+}
+if(length(results_median) > 0) {
+  all_results <- c(all_results, results_median)
+}
+
+if(length(all_results) > 0) {
+  # Create combined dataset
+  combined_patient_pod_results <- map_dfr(names(all_results), function(stratum_name) {
+    all_results[[stratum_name]] %>%
+      mutate(Analysis_Group = case_when(
+        Analysis_Type == "Predefined Time Periods" ~ "Predefined",
+        Analysis_Type == "Median Split" ~ "Median Split",
+        TRUE ~ Analysis_Type
+      ))
+  })
+  
+  # Create summary table
+  summary_table <- combined_patient_pod_results %>%
+    group_by(Analysis_Group, POD_Stratum) %>%
+    summarise(
+      Total_Metabolites = n(),
+      Significant_p01 = sum(p_value < 0.1, na.rm = TRUE),
+      Significant_p005 = sum(p_value < 0.05, na.rm = TRUE),
+      Significant_FDR005 = sum(FDR < 0.05, na.rm = TRUE),
+      Min_p_value = min(p_value, na.rm = TRUE),
+      Mean_n_never_2R = round(mean(n_never_2R, na.rm = TRUE), 1),
+      Mean_n_ever_2R = round(mean(n_ever_2R, na.rm = TRUE), 1),
+      .groups = "drop"
+    )
+  
+  cat("Summary of Patient-Level POD-Stratified Results:\n")
+  print(summary_table)
+  
+  # Export results
+  results_dir <- "./Immunosuppressive metabolites feature table/Results2/"
+  write_csv(combined_patient_pod_results, paste0(results_dir, "Patient_Level_POD_Stratified_Complete_Results.csv"))
+  write_csv(summary_table, paste0(results_dir, "Patient_Level_POD_Stratified_Summary.csv"))
+  
+  # Export significant results only
+  sig_only <- combined_patient_pod_results %>% filter(p_value < 0.1)
+  if(nrow(sig_only) > 0) {
+    write_csv(sig_only, paste0(results_dir, "Patient_Level_POD_Stratified_Significant_Only.csv"))
+    cat("\nExported", nrow(sig_only), "significant patient-level POD-stratified results (p < 0.1)\n")
+  }
+  
+} else {
+  cat("No results generated - insufficient sample sizes in POD strata\n")
+}
+
+cat("\n=== PATIENT-LEVEL POD-STRATIFIED ANALYSIS COMPLETE ===\n")
+
