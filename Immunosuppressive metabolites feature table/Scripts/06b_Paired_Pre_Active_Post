@@ -1,0 +1,372 @@
+#!/usr/bin/env Rscript
+
+# ============================================================================
+# 06b_Paired_Pre_Active_Post: 3-Timepoint Paired Analysis
+# ============================================================================
+# 
+# PURPOSE:
+# This script performs paired within-patient analysis across THREE timepoints:
+# pre-2R → active-2R → post-2R, focusing on reversibility/recovery questions.
+#
+# KEY FEATURES:
+# - Includes only patients with ALL THREE timepoints (pre + active + post)
+# - Tests both rejection onset (pre→active) AND resolution/recovery (active→post)
+# - Uses Friedman test for overall 3-way comparison + pairwise paired tests
+# - Creates 3-timepoint trajectory visualizations
+#
+# CLINICAL QUESTIONS ANSWERED:
+# 1) Does the metabolite shift at rejection and then return toward baseline? (reversibility)
+# 2) Is the change sustained after the 2R episode? (persistence)
+# 3) Does treatment/time affect metabolite levels post-rejection? (recovery pattern)
+#
+# DIFFERENCES FROM 06_Paired_Pre2R_vs_Active2R:
+# - Requires all 3 timepoints (smaller sample size, stricter inclusion)
+# - Tests recovery/treatment response, not just rejection signal
+# - Post-2R reflects treatment effects + time, not pure biology
+#
+# OUTPUT:
+# - Friedman test results (3-way comparison)
+# - Pairwise paired comparisons (pre vs active, active vs post, pre vs post)
+# - 3-timepoint trajectory plots
+# - Recovery/reversibility summaries
+#
+# ============================================================================
+
+# Source all required data and functions
+suppressMessages(suppressWarnings({
+  source("Immunosuppressive metabolites feature table/Scripts/00_source")
+}))
+
+cat("\n=== 3-TIMEPOINT PAIRED ANALYSIS: PRE-2R → ACTIVE-2R → POST-2R ===\n")
+
+# Create output directories
+output_dir <- "Results2/Paired_3Timepoint"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+
+# Get metabolite columns
+metadata_cols <- c("H", "POD", "S", "Sample_ID", "ACR")
+metabolite_cols <- setdiff(names(select_if(patients_with_2R, is.numeric)), metadata_cols)
+
+cat("Identified", length(metabolite_cols), "metabolite columns for 3-timepoint analysis\n")
+
+# ============================================================================
+# STEP 1: IDENTIFY PATIENTS WITH ALL 3 TIMEPOINTS
+# ============================================================================
+
+cat("\nStep 1: Identifying patients with pre-2R, active-2R, AND post-2R samples...\n")
+
+# Combine all three categories
+triplet_data <- bind_rows(
+  pre_2R %>% mutate(Sample_Category = "pre-2R"),
+  active_2R %>% mutate(Sample_Category = "active-2R"),
+  post_2R %>% mutate(Sample_Category = "post-2R")
+) %>%
+  arrange(H, Sample_Category)
+
+# Find patients with all 3 timepoints
+patients_with_all3 <- triplet_data %>%
+  group_by(H) %>%
+  summarise(
+    n_samples = n(),
+    has_pre = "pre-2R" %in% Sample_Category,
+    has_active = "active-2R" %in% Sample_Category,
+    has_post = "post-2R" %in% Sample_Category,
+    has_all3 = has_pre & has_active & has_post,
+    .groups = "drop"
+  ) %>%
+  filter(has_all3)
+
+cat("Patients with all 3 timepoints:", nrow(patients_with_all3), "\n")
+
+if (nrow(patients_with_all3) < 3) {
+  cat("\nINSUFFICIENT DATA: Need at least 3 patients with all 3 timepoints.\n")
+  cat("Current N =", nrow(patients_with_all3), "\n")
+  cat("Exiting script.\n")
+  quit(save = "no", status = 0)
+}
+
+# Get samples for these patients
+triplet_samples <- triplet_data %>%
+  filter(H %in% patients_with_all3$H)
+
+cat("Total samples in 3-timepoint cohort:", nrow(triplet_samples), "\n")
+cat("  Pre-2R samples:", sum(triplet_samples$Sample_Category == "pre-2R"), "\n")
+cat("  Active-2R samples:", sum(triplet_samples$Sample_Category == "active-2R"), "\n")
+cat("  Post-2R samples:", sum(triplet_samples$Sample_Category == "post-2R"), "\n")
+
+# ============================================================================
+# STEP 2: PREPARE DATA FOR 3-TIMEPOINT ANALYSIS
+# ============================================================================
+
+cat("\nStep 2: Preparing 3-timepoint paired data...\n")
+
+# Check for multiple samples per category
+sample_counts <- triplet_samples %>%
+  group_by(H, Sample_Category) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  filter(n > 1)
+
+if (nrow(sample_counts) > 0) {
+  cat("Found patients with multiple samples per category. Will aggregate using median.\n")
+}
+
+# Create wide format with all 3 timepoints
+create_triplet_data <- function(metabolite_col) {
+  triplet_samples %>%
+    select(H, Sample_Category, concentration = !!sym(metabolite_col)) %>%
+    group_by(H, Sample_Category) %>%
+    summarise(concentration = median(concentration, na.rm = TRUE), .groups = "drop") %>%
+    pivot_wider(
+      names_from = Sample_Category,
+      values_from = concentration
+    ) %>%
+    filter(!is.na(`pre-2R`) & !is.na(`active-2R`) & !is.na(`post-2R`)) %>%
+    mutate(
+      diff_pre_to_active = `active-2R` - `pre-2R`,
+      diff_active_to_post = `post-2R` - `active-2R`,
+      diff_pre_to_post = `post-2R` - `pre-2R`
+    )
+}
+
+# ============================================================================
+# STEP 3: STATISTICAL TESTS (FRIEDMAN + PAIRWISE)
+# ============================================================================
+
+cat("\nStep 3: Performing 3-timepoint statistical tests...\n")
+
+triplet_results <- data.frame()
+
+perform_triplet_tests <- function(metabolite_col) {
+  metabolite_name <- gsub("\\.", " ", metabolite_col)
+  triplet_met <- create_triplet_data(metabolite_col)
+  
+  if (nrow(triplet_met) < 3) {
+    return(data.frame(
+      Metabolite = metabolite_name,
+      N_Triplets = nrow(triplet_met),
+      Friedman_pvalue = NA,
+      Wilcox_pre_vs_active = NA,
+      Wilcox_active_vs_post = NA,
+      Wilcox_pre_vs_post = NA
+    ))
+  }
+  
+  # Friedman test (non-parametric repeated measures)
+  triplet_long <- triplet_met %>%
+    select(H, `pre-2R`, `active-2R`, `post-2R`) %>%
+    pivot_longer(cols = c(`pre-2R`, `active-2R`, `post-2R`), 
+                 names_to = "timepoint", values_to = "value")
+  
+  friedman_p <- tryCatch({
+    friedman.test(value ~ timepoint | H, data = triplet_long)$p.value
+  }, error = function(e) NA_real_)
+  
+  # Pairwise Wilcoxon signed-rank tests
+  p_pre_active <- tryCatch(
+    wilcox.test(triplet_met$`active-2R`, triplet_met$`pre-2R`, paired = TRUE, exact = FALSE)$p.value,
+    error = function(e) NA_real_
+  )
+  
+  p_active_post <- tryCatch(
+    wilcox.test(triplet_met$`post-2R`, triplet_met$`active-2R`, paired = TRUE, exact = FALSE)$p.value,
+    error = function(e) NA_real_
+  )
+  
+  p_pre_post <- tryCatch(
+    wilcox.test(triplet_met$`post-2R`, triplet_met$`pre-2R`, paired = TRUE, exact = FALSE)$p.value,
+    error = function(e) NA_real_
+  )
+  
+  return(data.frame(
+    Metabolite = metabolite_name,
+    N_Triplets = nrow(triplet_met),
+    Friedman_pvalue = friedman_p,
+    Wilcox_pre_vs_active = p_pre_active,
+    Wilcox_active_vs_post = p_active_post,
+    Wilcox_pre_vs_post = p_pre_post
+  ))
+}
+
+# Run for all metabolites
+for (met in metabolite_cols) {
+  result <- perform_triplet_tests(met)
+  triplet_results <- rbind(triplet_results, result)
+}
+
+# FDR correction
+triplet_results <- triplet_results %>%
+  mutate(
+    Friedman_pvalue_adj = p.adjust(Friedman_pvalue, method = "fdr"),
+    Wilcox_pre_vs_active_adj = p.adjust(Wilcox_pre_vs_active, method = "fdr"),
+    Wilcox_active_vs_post_adj = p.adjust(Wilcox_active_vs_post, method = "fdr"),
+    Wilcox_pre_vs_post_adj = p.adjust(Wilcox_pre_vs_post, method = "fdr")
+  ) %>%
+  arrange(Friedman_pvalue)
+
+# Save results
+write.csv(triplet_results, file.path(output_dir, "3Timepoint_Statistical_Results.csv"), row.names = FALSE)
+
+cat("\n3-Timepoint Analysis Summary:\n")
+cat("Significant overall (Friedman, FDR < 0.05):", 
+    sum(triplet_results$Friedman_pvalue_adj < 0.05, na.rm = TRUE), "\n")
+cat("Significant pre→active (FDR < 0.05):", 
+    sum(triplet_results$Wilcox_pre_vs_active_adj < 0.05, na.rm = TRUE), "\n")
+cat("Significant active→post (FDR < 0.05):", 
+    sum(triplet_results$Wilcox_active_vs_post_adj < 0.05, na.rm = TRUE), "\n")
+
+print(head(triplet_results, 10))
+
+# ============================================================================
+# STEP 4: 3-TIMEPOINT TRAJECTORY PLOTS
+# ============================================================================
+
+cat("\nStep 4: Creating 3-timepoint trajectory plots...\n")
+
+# Function to create 3-timepoint trajectory plot
+create_3tp_plot <- function(metabolite_col) {
+  metabolite_name <- gsub("\\.", " ", metabolite_col)
+  triplet_met <- create_triplet_data(metabolite_col)
+  
+  if (nrow(triplet_met) < 3) return(NULL)
+  
+  # Get p-values for annotation
+  result_row <- triplet_results %>% filter(Metabolite == metabolite_name)
+  friedman_p <- result_row$Friedman_pvalue
+  
+  # Long format for plotting
+  triplet_long <- triplet_met %>%
+    select(H, `pre-2R`, `active-2R`, `post-2R`) %>%
+    pivot_longer(cols = c(`pre-2R`, `active-2R`, `post-2R`), 
+                 names_to = "timepoint", values_to = "value") %>%
+    mutate(timepoint = factor(timepoint, levels = c("pre-2R", "active-2R", "post-2R")))
+  
+  # Calculate medians
+  medians <- triplet_long %>%
+    group_by(timepoint) %>%
+    summarise(median_val = median(value, na.rm = TRUE), .groups = "drop")
+  
+  # Main trajectory plot
+  ggplot(triplet_long, aes(x = timepoint, y = value)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.3, fill = "gray80") +
+    geom_line(aes(group = H), alpha = 0.5, color = "gray60") +
+    geom_point(aes(group = H), alpha = 0.7, size = 2) +
+    stat_summary(fun = median, geom = "point", color = "red", size = 3) +
+    stat_summary(fun = median, geom = "line", aes(group = 1), color = "red", linewidth = 1.2) +
+    labs(
+      title = paste("3-Timepoint Trajectory:", metabolite_name),
+      subtitle = paste0(
+        "n = ", nrow(triplet_met), " patients; ",
+        "Friedman p = ", format(friedman_p, digits = 3), "\n",
+        "Median: pre=", round(medians$median_val[1], 2),
+        ", active=", round(medians$median_val[2], 2),
+        ", post=", round(medians$median_val[3], 2)
+      ),
+      x = NULL,
+      y = "Concentration"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 12),
+      axis.text.x = element_text(face = "bold", angle = 20, hjust = 1)
+    )
+}
+
+# Plot significant metabolites (Friedman FDR < 0.05)
+plot_dir_sig <- file.path(output_dir, "Plots_Friedman_FDR0.05")
+plot_dir_p01 <- file.path(output_dir, "Plots_Friedman_p0.1_unadjusted")
+if (!dir.exists(plot_dir_sig)) dir.create(plot_dir_sig, recursive = TRUE)
+if (!dir.exists(plot_dir_p01)) dir.create(plot_dir_p01, recursive = TRUE)
+
+sig_metabolites <- triplet_results %>%
+  filter(Friedman_pvalue_adj < 0.05) %>%
+  pull(Metabolite)
+
+if (length(sig_metabolites) > 0) {
+  for (met_name in sig_metabolites) {
+    met_col <- gsub(" ", "\\.", met_name)
+    if (met_col %in% metabolite_cols) {
+      plot <- create_3tp_plot(met_col)
+      if (!is.null(plot)) {
+        safe_filename <- gsub("[^A-Za-z0-9_-]", "_", met_name)
+        ggsave(file.path(plot_dir_sig, paste0(safe_filename, "_3timepoint_FDR0.05.png")), 
+               plot, width = 10, height = 7, dpi = 300)
+      }
+    }
+  }
+  cat("Created 3-timepoint plots for", length(sig_metabolites), "significant metabolites (FDR < 0.05)\n")
+} else {
+  cat("No metabolites reached Friedman significance (FDR < 0.05)\n")
+}
+
+# Exploratory plots (unadjusted p < 0.1)
+suggestive_metabolites <- triplet_results %>%
+  filter(!is.na(Friedman_pvalue) & Friedman_pvalue < 0.1) %>%
+  arrange(Friedman_pvalue) %>%
+  pull(Metabolite)
+
+if (length(suggestive_metabolites) > 0) {
+  n_plot <- min(15, length(suggestive_metabolites))
+  suggestive_top <- suggestive_metabolites[seq_len(n_plot)]
+  
+  for (met_name in suggestive_top) {
+    met_col <- gsub(" ", "\\.", met_name)
+    if (met_col %in% metabolite_cols) {
+      plot <- create_3tp_plot(met_col)
+      if (!is.null(plot)) {
+        safe_filename <- gsub("[^A-Za-z0-9_-]", "_", met_name)
+        ggsave(file.path(plot_dir_p01, paste0(safe_filename, "_3timepoint_p0.1.png")), 
+               plot, width = 10, height = 7, dpi = 300)
+      }
+    }
+  }
+  cat("Created 3-timepoint plots for", n_plot, "suggestive metabolites (p < 0.1)\n")
+}
+
+# ============================================================================
+# STEP 5: REVERSIBILITY SUMMARY
+# ============================================================================
+
+cat("\nStep 5: Creating reversibility/recovery summary...\n")
+
+# Classify metabolites by pattern
+triplet_summary <- triplet_results %>%
+  filter(!is.na(Wilcox_pre_vs_active) & !is.na(Wilcox_active_vs_post)) %>%
+  mutate(
+    pattern = case_when(
+      Wilcox_pre_vs_active < 0.05 & Wilcox_active_vs_post < 0.05 ~ "Reversible (pre≠active, active≠post)",
+      Wilcox_pre_vs_active < 0.05 & Wilcox_active_vs_post >= 0.05 ~ "Persistent (pre≠active, active=post)",
+      Wilcox_pre_vs_active >= 0.05 & Wilcox_active_vs_post < 0.05 ~ "Late change (pre=active, active≠post)",
+      TRUE ~ "No significant change"
+    )
+  )
+
+pattern_counts <- triplet_summary %>%
+  count(pattern) %>%
+  arrange(desc(n))
+
+cat("\nReversibility patterns (unadjusted p < 0.05):\n")
+print(pattern_counts)
+
+write.csv(triplet_summary, file.path(output_dir, "Reversibility_Pattern_Summary.csv"), row.names = FALSE)
+
+# ============================================================================
+# FINAL SUMMARY
+# ============================================================================
+
+cat("\n=== 3-TIMEPOINT ANALYSIS COMPLETE ===\n")
+cat("Results saved to:", output_dir, "\n")
+cat("Key findings:\n")
+cat("- Patients with all 3 timepoints:", nrow(patients_with_all3), "\n")
+cat("- Metabolites tested:", nrow(triplet_results), "\n")
+cat("- Significant overall change (Friedman FDR < 0.05):", 
+    sum(triplet_results$Friedman_pvalue_adj < 0.05, na.rm = TRUE), "\n")
+
+cat("\nInterpretation notes:\n")
+cat("- Post-2R samples may reflect treatment effects (steroids, immunosuppression)\n")
+cat("- 'Reversible' = shifted at rejection, returned toward baseline post-treatment\n")
+cat("- 'Persistent' = shifted at rejection, stayed changed post-treatment\n")
+cat("- Smaller N than 2-timepoint analysis due to stricter inclusion (all 3 required)\n")
+
+cat("\n=== SCRIPT COMPLETE ===\n")
