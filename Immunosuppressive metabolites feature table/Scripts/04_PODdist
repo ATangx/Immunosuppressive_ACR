@@ -131,10 +131,10 @@ p5 <- nonlog2_data %>%
     ungroup() %>%
     filter(n_samples > 1) %>%  # Only show patients with multiple samples
     ggplot(aes(x = POD, y = H_ordered)) +
-    geom_line(aes(group = H_ordered), color = "gray70", alpha = 0.5, size = 0.5) +
-    geom_point(aes(color = ACR, shape = has_2R), size = 3, alpha = 0.9) +
+    geom_line(aes(group = H_ordered), color = "gray70", alpha = 0.8, size = 0.8) +
+    geom_point(aes(color = ACR, shape = has_2R), size = 2.5, alpha = 0.8) +
     scale_color_manual(
-        values = c("0R" = "green", "1R" = "orange", "2R" = "red", "2RB" = "darkred"),
+        values = c("0R" = "#2E8B57", "1R" = "#CD853F", "2R" = "#B22222", "2RB" = "#8B0000"),
         name = "ACR Grade"
     ) +
     scale_shape_manual(
@@ -150,12 +150,21 @@ p5 <- nonlog2_data %>%
     ) +
     theme_minimal() +
     theme(
-        axis.text.y = element_text(size = 8),
-        legend.position = "bottom"
+        axis.text.y = element_text(size = 7, color = "black"),
+        axis.text.x = element_text(size = 10, color = "black"),
+        axis.title.x = element_text(size = 12, color = "black"),
+        axis.title.y = element_text(size = 12, color = "black"),
+        legend.position = "bottom",
+        legend.text = element_text(size = 10, color = "black"),
+        legend.title = element_text(size = 11, color = "black"),
+        plot.title = element_text(size = 14, color = "black"),
+        plot.subtitle = element_text(size = 12, color = "gray20"),
+        panel.grid.major = element_line(color = "gray90"),
+        panel.grid.minor = element_line(color = "gray95")
     ) +
     guides(
-        color = guide_legend(override.aes = list(size = 4)),
-        shape = guide_legend(override.aes = list(size = 4))
+        color = guide_legend(override.aes = list(size = 3)),
+        shape = guide_legend(override.aes = list(size = 3))
     )
 
 print(p5)
