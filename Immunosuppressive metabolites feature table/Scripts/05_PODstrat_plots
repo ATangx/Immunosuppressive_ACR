@@ -5,20 +5,11 @@ cat("Creating plots for POD-stratified significant results\n\n")
 
 # Define POD strata
 pod_strata <- list(
-  "Early (≤30 days)" = c(0, 30),
-  "Medium (31-90 days)" = c(31, 90), 
-  "Late (91-180 days)" = c(91, 180),
-  "Very Late (>180 days)" = c(181, Inf)
+  "Early (≤30 days)" = c(0, 30),     # Post transplant periods
+  "Mid (31-90 days)" = c(31, 90),   
+  "Late (>90 days)" = c(91, Inf)      
 )
 pod_median <- median(patients_with_2R$POD, na.rm = TRUE)
-
-pod_quartiles <- quantile(patients_with_2R$POD, c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
-pod_strata_quartiles <- list(
-  "Q1 (Earliest)" = c(pod_quartiles[1], pod_quartiles[2]),
-  "Q2 (Early-Med)" = c(pod_quartiles[2] + 1, pod_quartiles[3]),
-  "Q3 (Med-Late)" = c(pod_quartiles[3] + 1, pod_quartiles[4]), 
-  "Q4 (Latest)" = c(pod_quartiles[4] + 1, pod_quartiles[5])
-)
 
 # Add median-based POD split for comparison
 pod_strata_median <- list(
@@ -124,10 +115,6 @@ perform_pod_plotting <- function(data, strata_list) {
 cat("Creating plots for predefined POD strata...\n")
 results_predefined <- perform_pod_plotting(patients_with_2R, pod_strata)
 
-# Create plots for quartile strata  
-cat("Creating plots for quartile POD strata...\n")
-results_quartiles <- perform_pod_plotting(patients_with_2R, pod_strata_quartiles)
-
 # Create plots for median split (simple two-group comparison)
 cat("Creating plots for median-split POD strata...\n")
 results_median <- perform_pod_plotting(patients_with_2R, pod_strata_median)
@@ -157,7 +144,6 @@ create_summary_table <- function(results_list, analysis_name) {
 # Create summaries
 all_summaries <- bind_rows(
   if(length(results_predefined) > 0) create_summary_table(results_predefined, "Predefined") else NULL,
-  if(length(results_quartiles) > 0) create_summary_table(results_quartiles, "Quartiles") else NULL,
   if(length(results_median) > 0) create_summary_table(results_median, "Median Split") else NULL
 )
 
@@ -169,9 +155,6 @@ if(nrow(all_summaries) > 0) {
   combined_results <- bind_rows(
     if(length(results_predefined) > 0) {
       map_dfr(names(results_predefined), ~ results_predefined[[.x]] %>% mutate(Analysis_Group = "Predefined"))
-    } else NULL,
-    if(length(results_quartiles) > 0) {
-      map_dfr(names(results_quartiles), ~ results_quartiles[[.x]] %>% mutate(Analysis_Group = "Quartiles"))
     } else NULL,
     if(length(results_median) > 0) {
       map_dfr(names(results_median), ~ results_median[[.x]] %>% mutate(Analysis_Group = "Median Split"))

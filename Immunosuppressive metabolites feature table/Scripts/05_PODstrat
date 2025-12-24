@@ -8,13 +8,14 @@ cat("Performing Wilcoxon tests within each POD timepoint\n\n")
 pod_quartiles <- quantile(patients_with_2R$POD, c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
 pod_median <- median(patients_with_2R$POD, na.rm = TRUE)
 
+# Define POD strata
 pod_strata <- list(
-  "Early (≤30 days)" = c(0, 30),
-  "Medium (31-90 days)" = c(31, 90), 
-  "Late (91-180 days)" = c(91, 180),
-  "Very Late (>180 days)" = c(181, Inf)
+  "Early (≤30 days)" = c(0, 30),     # Post transplant periods
+  "Mid (31-90 days)" = c(31, 90),   
+  "Late (>90 days)" = c(91, Inf)      
 )
 
+pod_median <- median(patients_with_2R$POD, na.rm = TRUE)
 pod_strata_median <- list(
   "Below Median" = c(0, pod_median),
   "Above Median" = c(pod_median + 1, Inf)
