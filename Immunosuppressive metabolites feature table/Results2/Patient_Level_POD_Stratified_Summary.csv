@@ -2,4 +2,4 @@ Analysis_Group,POD_Stratum,Total_Metabolites,Significant_p01,Significant_p005,Si
 Median Split,Above Median POD,14,2,1,0,0.015126050420168066,13,4
 Median Split,Below Median POD,14,2,2,0,0.011764705882352941,4,14
 Predefined,Early (≤30 days),14,3,0,0,0.09453781512605043,5,13
-Predefined,Late (91-180 days),14,2,1,0,0.03910594620994303,12,4
+Predefined,Late (>90 days),14,2,1,0,0.03910594620994303,12,4
