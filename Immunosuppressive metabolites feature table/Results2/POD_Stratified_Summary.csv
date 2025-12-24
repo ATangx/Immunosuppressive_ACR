@@ -1,0 +1,6 @@
+Analysis,Stratum,Total_Metabolites,Significant_p005,Significant_FDR005,Min_Pvalue
+Predefined,Early (≤30 days),14,0,0,0.0765
+Predefined,Medium (31-90 days),14,0,0,0.207
+Predefined,Late (91-180 days),14,0,0,0.0719
+Median,Below Median,14,1,0,0.0492
+Median,Above Median,14,0,0,0.0905

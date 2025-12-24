@@ -1,0 +1,10 @@
+Analysis,Stratum,Total_Metabolites,Significant_p01,Significant_p005,Significant_FDR005
+Predefined,Early (≤30 days),14,2,0,0
+Predefined,Medium (31-90 days),14,0,0,0
+Predefined,Late (91-180 days),14,1,0,0
+Quartiles,Q1 (Earliest),14,0,0,0
+Quartiles,Q2 (Early-Med),14,0,0,0
+Quartiles,Q3 (Med-Late),14,0,0,0
+Quartiles,Q4 (Latest),14,1,0,0
+Median Split,Below Median POD,14,1,1,0
+Median Split,Above Median POD,14,1,0,0

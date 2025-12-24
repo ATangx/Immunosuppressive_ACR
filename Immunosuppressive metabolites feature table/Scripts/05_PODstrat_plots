@@ -10,6 +10,7 @@ pod_strata <- list(
   "Late (91-180 days)" = c(91, 180),
   "Very Late (>180 days)" = c(181, Inf)
 )
+pod_median <- median(patients_with_2R$POD, na.rm = TRUE)
 
 pod_quartiles <- quantile(patients_with_2R$POD, c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
 pod_strata_quartiles <- list(
@@ -17,6 +18,12 @@ pod_strata_quartiles <- list(
   "Q2 (Early-Med)" = c(pod_quartiles[2] + 1, pod_quartiles[3]),
   "Q3 (Med-Late)" = c(pod_quartiles[3] + 1, pod_quartiles[4]), 
   "Q4 (Latest)" = c(pod_quartiles[4] + 1, pod_quartiles[5])
+)
+
+# Add median-based POD split for comparison
+pod_strata_median <- list(
+  "Below Median POD" = c(0, pod_median),
+  "Above Median POD" = c(pod_median + 1, Inf)
 )
 
 # Function to find significant results and create plots
@@ -121,6 +128,10 @@ results_predefined <- perform_pod_plotting(patients_with_2R, pod_strata)
 cat("Creating plots for quartile POD strata...\n")
 results_quartiles <- perform_pod_plotting(patients_with_2R, pod_strata_quartiles)
 
+# Create plots for median split (simple two-group comparison)
+cat("Creating plots for median-split POD strata...\n")
+results_median <- perform_pod_plotting(patients_with_2R, pod_strata_median)
+
 #=== SUMMARY AND EXPORT ===
 
 cat("\n=== SUMMARY ACROSS ALL STRATA ===\n")
@@ -146,7 +157,8 @@ create_summary_table <- function(results_list, analysis_name) {
 # Create summaries
 all_summaries <- bind_rows(
   if(length(results_predefined) > 0) create_summary_table(results_predefined, "Predefined") else NULL,
-  if(length(results_quartiles) > 0) create_summary_table(results_quartiles, "Quartiles") else NULL
+  if(length(results_quartiles) > 0) create_summary_table(results_quartiles, "Quartiles") else NULL,
+  if(length(results_median) > 0) create_summary_table(results_median, "Median Split") else NULL
 )
 
 if(nrow(all_summaries) > 0) {
@@ -160,6 +172,9 @@ if(nrow(all_summaries) > 0) {
     } else NULL,
     if(length(results_quartiles) > 0) {
       map_dfr(names(results_quartiles), ~ results_quartiles[[.x]] %>% mutate(Analysis_Group = "Quartiles"))
+    } else NULL,
+    if(length(results_median) > 0) {
+      map_dfr(names(results_median), ~ results_median[[.x]] %>% mutate(Analysis_Group = "Median Split"))
     } else NULL
   )
   
