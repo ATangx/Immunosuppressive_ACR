@@ -185,7 +185,90 @@ if(nrow(wilcox_res_patient) > 0) {
   cat("Patient-level Wilcoxon (non-log2) results:\n")
   cat("Total metabolites tested:", nrow(wilcox_res_patient), "\n")
   cat("Significant metabolites (p < 0.05):", sum(wilcox_res_patient$p_value < 0.05, na.rm = TRUE), "\n")
+  cat("Suggestive metabolites (p < 0.1):", sum(wilcox_res_patient$p_value < 0.1, na.rm = TRUE), "\n")
   cat("Significant metabolites (FDR < 0.05):", sum(wilcox_res_patient$FDR < 0.05, na.rm = TRUE), "\n")
+
+  # === EXPLORATORY PLOTTING (p < 0.1) ===
+  cat("\n=== PLOTTING PATIENT-LEVEL WILCOXON (NON-LOG2) RESULTS: p < 0.1 (EXPLORATORY) ===\n")
+
+  plot_dir_p01 <- file.path(results_dir, "Plots_p0.1")
+  if (!dir.exists(plot_dir_p01)) {
+    dir.create(plot_dir_p01, recursive = TRUE)
+  }
+
+  sig_mets_p01 <- wilcox_res_patient %>%
+    filter(p_value < 0.1) %>%
+    arrange(p_value)
+
+  if (nrow(sig_mets_p01) == 0) {
+    cat("No metabolites with p < 0.1 to plot.\n")
+  } else {
+    # Limit plots to a manageable number
+    n_plot <- min(15, nrow(sig_mets_p01))
+    sig_mets_p01_top <- sig_mets_p01 %>%
+      slice_head(n = n_plot)
+
+    # Prefer existing plot helper if available (used in other scripts)
+    if (exists("plot_enhanced_bars")) {
+      plots <- plot_enhanced_bars(
+        sig_mets_p01_top,
+        acr_0_1r_patient,
+        acr_2r_patient,
+        use_median = TRUE,
+        analysis_level = "Patient-Level",
+        test_type = "Wilcoxon (Non-log2)"
+      )
+
+      for (met in names(plots)) {
+        ggsave(
+          filename = file.path(plot_dir_p01, paste0(met, "_WilcoxonNonLog2_p0.1.png")),
+          plot = plots[[met]],
+          dpi = 300,
+          width = 8,
+          height = 6
+        )
+      }
+
+      cat("Saved", length(plots), "exploratory plots (p < 0.1) to:", plot_dir_p01, "\n")
+    } else {
+      # Fallback: simple boxplot + jitter
+      cat("Note: plot_enhanced_bars() not found; using fallback ggplot boxplots.\n")
+
+      for (i in seq_len(nrow(sig_mets_p01_top))) {
+        met <- sig_mets_p01_top$Metabolite[i]
+        pval <- sig_mets_p01_top$p_value[i]
+
+        plot_df <- patient_aggregated %>%
+          transmute(
+            Group = ifelse(ACR_has_2R, "Had 2R+", "Never had 2R+"),
+            Value = .data[[met]]
+          ) %>%
+          filter(!is.na(Value))
+
+        p <- ggplot(plot_df, aes(x = Group, y = Value, fill = Group)) +
+          geom_boxplot(outlier.shape = NA, alpha = 0.4) +
+          geom_jitter(width = 0.15, alpha = 0.75, size = 2) +
+          labs(
+            title = paste0("Patient-Level Wilcoxon (Non-log2): ", met),
+            subtitle = paste0("Exploratory p < 0.1; p = ", signif(pval, 3)),
+            x = NULL,
+            y = "Concentration"
+          ) +
+          theme_minimal() +
+          theme(legend.position = "none")
+
+        ggsave(
+          filename = file.path(plot_dir_p01, paste0(met, "_WilcoxonNonLog2_p0.1.png")),
+          plot = p,
+          dpi = 300,
+          width = 8,
+          height = 6
+        )
+      }
+
+      cat("Saved", nrow(sig_mets_p01_top), "fallback exploratory plots (p < 0.1) to:", plot_dir_p01, "\n")
+    }
+  }
 }
 
 #=== EXPORT RESULTS ===

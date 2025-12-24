@@ -1,0 +1,488 @@
+# ============================================================================
+# 06_Paired_Pre2R_vs_Active2R: Paired Within-Patient Pre-2R vs Active-2R Analysis
+# ============================================================================
+# 
+# PURPOSE:
+# This script performs paired within-patient analysis comparing pre-2R vs active-2R 
+# samples from the same patients. This is a matched analysis that controls for 
+# patient-level factors by comparing changes within individuals.
+#
+# KEY FEATURES:
+# - Focuses only on patients who have BOTH pre-2R AND active-2R samples
+# - Uses paired statistical tests (paired t-test, Wilcoxon signed-rank test)
+# - Creates paired difference plots and trajectory visualizations
+# - Controls for inter-patient variability by design
+#
+# DIFFERENCES FROM OTHER SCRIPTS:
+# - Unlike 03_tests: Uses paired analysis instead of independent group comparisons
+# - Unlike 05a-05d: Focuses specifically on pre-2R vs active-2R transition
+# - Unlike 05_PODstrat: No POD stratification, focuses on rejection status change
+#
+# OUTPUT:
+# - Paired statistical test results
+# - Paired difference plots showing within-patient changes
+# - Individual patient trajectory plots
+# - Summary statistics for paired changes
+#
+# ============================================================================
+
+# Source all required data and functions
+suppressMessages(suppressWarnings({
+  source("Immunosuppressive metabolites feature table/Scripts/00_source")
+}))
+
+cat("\n=== PAIRED WITHIN-PATIENT PRE-2R vs ACTIVE-2R ANALYSIS ===\n")
+
+# Create output directories
+output_dir <- "Results2/Paired_Pre2R_vs_Active2R"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+
+# Get metabolite columns (exclude metadata columns)
+metadata_cols <- c("H", "POD", "S", "Sample_ID", "ACR")
+metabolite_cols <- setdiff(names(select_if(patients_with_2R, is.numeric)), metadata_cols)
+
+cat("Identified", length(metabolite_cols), "metabolite columns for paired analysis\n")
+
+# ============================================================================
+# STEP 1: IDENTIFY PAIRED SAMPLES
+# ============================================================================
+
+cat("\nStep 1: Identifying patients with both pre-2R and active-2R samples...\n")
+
+# Create combined dataset with proper categorization
+paired_data <- bind_rows(
+  pre_2R %>% mutate(Sample_Category = "pre-2R"),
+  active_2R %>% mutate(Sample_Category = "active-2R")
+) %>%
+  arrange(H, Sample_Category)
+
+# Find patients with both sample types
+patients_with_both <- paired_data %>%
+  group_by(H) %>%
+  summarise(
+    n_samples = n(),
+    categories = list(unique(Sample_Category)),
+    has_both = length(unique(Sample_Category)) == 2,
+    .groups = "drop"
+  ) %>%
+  filter(has_both)
+
+cat("Patients with both pre-2R and active-2R samples:", nrow(patients_with_both), "\n")
+
+# Get the actual paired samples
+paired_samples <- paired_data %>%
+  filter(H %in% patients_with_both$H)
+
+cat("Total paired samples:", nrow(paired_samples), "\n")
+cat("Pre-2R samples:", sum(paired_samples$Sample_Category == "pre-2R"), "\n")
+cat("Active-2R samples:", sum(paired_samples$Sample_Category == "active-2R"), "\n")
+
+# ============================================================================
+# STEP 2: PREPARE DATA FOR PAIRED ANALYSIS
+# ============================================================================
+
+cat("\nStep 2: Preparing data for paired analysis...\n")
+
+# Check for patients with multiple samples per category
+sample_counts <- paired_samples %>%
+  group_by(H, Sample_Category) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  filter(n > 1)
+
+if (nrow(sample_counts) > 0) {
+  cat("Found patients with multiple samples per category. Will aggregate using median.\n")
+  print(sample_counts)
+}
+
+# Create wide format for paired analysis with aggregation
+create_paired_data <- function(metabolite_col) {
+  # First aggregate multiple samples per patient per category using median
+  aggregated_data <- paired_samples %>%
+    select(H, Sample_Category, concentration = !!sym(metabolite_col)) %>%
+    group_by(H, Sample_Category) %>%
+    summarise(concentration = median(concentration, na.rm = TRUE), .groups = "drop") %>%
+    pivot_wider(
+      names_from = Sample_Category,
+      values_from = concentration,
+      names_prefix = ""
+    ) %>%
+    filter(!is.na(`pre-2R`) & !is.na(`active-2R`))
+  
+  # Add derived columns
+  aggregated_data %>%
+    mutate(
+      difference = `active-2R` - `pre-2R`,
+      log_ratio = log2(`active-2R` / `pre-2R`),
+      percent_change = ((`active-2R` - `pre-2R`) / `pre-2R`) * 100
+    )
+}
+
+# ============================================================================
+# STEP 3: PAIRED STATISTICAL TESTS
+# ============================================================================
+
+cat("\nStep 3: Performing paired statistical tests...\n")
+
+# Initialize results dataframe
+paired_results <- data.frame()
+
+# Function to perform paired tests
+perform_paired_tests <- function(metabolite_col) {
+  metabolite_name <- gsub("\\.", " ", metabolite_col)
+  
+  # Get paired data
+  paired_met <- create_paired_data(metabolite_col)
+  
+  if (nrow(paired_met) < 3) {
+    return(data.frame(
+      Metabolite = metabolite_name,
+      N_Pairs = nrow(paired_met),
+      Mean_Pre2R = NA,
+      Mean_Active2R = NA,
+      Mean_Difference = NA,
+      Paired_t_pvalue = NA,
+      Wilcoxon_pvalue = NA,
+      Effect_Size = NA
+    ))
+  }
+  
+  # Paired t-test
+  t_test <- t.test(paired_met$`active-2R`, paired_met$`pre-2R`, paired = TRUE)
+  
+  # Wilcoxon signed-rank test
+  wilcox_test <- wilcox.test(paired_met$`active-2R`, paired_met$`pre-2R`, paired = TRUE)
+  
+  # Effect size (Cohen's d for paired data)
+  effect_size <- mean(paired_met$difference) / sd(paired_met$difference)
+  
+  return(data.frame(
+    Metabolite = metabolite_name,
+    N_Pairs = nrow(paired_met),
+    Mean_Pre2R = mean(paired_met$`pre-2R`, na.rm = TRUE),
+    Mean_Active2R = mean(paired_met$`active-2R`, na.rm = TRUE),
+    Mean_Difference = mean(paired_met$difference, na.rm = TRUE),
+    Paired_t_pvalue = t_test$p.value,
+    Wilcoxon_pvalue = wilcox_test$p.value,
+    Effect_Size = effect_size
+  ))
+}
+
+# Run tests for all metabolites
+for (met in metabolite_cols) {
+  result <- perform_paired_tests(met)
+  paired_results <- rbind(paired_results, result)
+}
+
+# Add multiple testing correction
+paired_results$Paired_t_pvalue_adj <- p.adjust(paired_results$Paired_t_pvalue, method = "fdr")
+paired_results$Wilcoxon_pvalue_adj <- p.adjust(paired_results$Wilcoxon_pvalue, method = "fdr")
+
+# Sort by p-value
+paired_results <- paired_results %>%
+  arrange(Paired_t_pvalue)
+
+# Save results
+write.csv(paired_results, file.path(output_dir, "Paired_Statistical_Results.csv"), row.names = FALSE)
+
+# Print summary
+cat("\nPaired Analysis Summary:\n")
+cat("Significant metabolites (paired t-test, FDR < 0.05):", 
+    sum(paired_results$Paired_t_pvalue_adj < 0.05, na.rm = TRUE), "\n")
+cat("Significant metabolites (Wilcoxon, FDR < 0.05):", 
+    sum(paired_results$Wilcoxon_pvalue_adj < 0.05, na.rm = TRUE), "\n")
+
+print(head(paired_results, 10))
+
+# ============================================================================
+# STEP 4: PAIRED DIFFERENCE PLOTS
+# ============================================================================
+
+cat("\nStep 4: Creating paired difference plots...\n")
+
+# Function to create paired difference plot
+create_paired_plot <- function(metabolite_col) {
+  metabolite_name <- gsub("\\.", " ", metabolite_col)
+  paired_met <- create_paired_data(metabolite_col)
+  
+  if (nrow(paired_met) < 3) return(NULL)
+  
+  # Paired difference plot
+  p1 <- ggplot(paired_met, aes(x = `pre-2R`, y = `active-2R`)) +
+    geom_point(alpha = 0.7, size = 2) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+    geom_smooth(method = "lm", se = TRUE, color = "blue") +
+    labs(
+      title = paste("Paired Analysis:", metabolite_name),
+      x = "Pre-2R Concentration",
+      y = "Active-2R Concentration",
+      subtitle = paste("n =", nrow(paired_met), "paired samples")
+    ) +
+    theme_minimal() +
+    theme(plot.title = element_text(size = 12, face = "bold"))
+  
+  # Before-after plot
+  paired_long <- paired_met %>%
+    pivot_longer(cols = c(`pre-2R`, `active-2R`), 
+                 names_to = "timepoint", values_to = "concentration") %>%
+    mutate(timepoint = factor(timepoint, levels = c("pre-2R", "active-2R")))
+  
+  p2 <- ggplot(paired_long, aes(x = timepoint, y = concentration)) +
+    geom_line(aes(group = H), alpha = 0.5, color = "gray") +
+    geom_point(aes(group = H), alpha = 0.7) +
+    stat_summary(fun = mean, geom = "point", color = "red", size = 3) +
+    stat_summary(fun = mean, geom = "line", aes(group = 1), color = "red", size = 1) +
+    stat_summary(fun.data = mean_se, geom = "errorbar", color = "red", width = 0.1) +
+    labs(
+      title = paste("Patient Trajectories:", metabolite_name),
+      x = "Sample Type",
+      y = "Concentration",
+      subtitle = paste("Red line = mean trajectory, n =", nrow(paired_met))
+    ) +
+    theme_minimal() +
+    theme(plot.title = element_text(size = 12, face = "bold"))
+  
+  # Difference distribution
+  p3 <- ggplot(paired_met, aes(x = difference)) +
+    geom_histogram(bins = 15, alpha = 0.7, fill = "steelblue", color = "black") +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+    geom_vline(xintercept = mean(paired_met$difference), linetype = "solid", color = "blue") +
+    labs(
+      title = paste("Change Distribution:", metabolite_name),
+      x = "Change (Active-2R - Pre-2R)",
+      y = "Count",
+      subtitle = paste("Mean change =", round(mean(paired_met$difference), 3))
+    ) +
+    theme_minimal() +
+    theme(plot.title = element_text(size = 12, face = "bold"))
+  
+  # Combine plots
+  combined_plot <- (p1 | p2) / p3
+  
+  return(combined_plot)
+}
+
+# Function to create median-focused paired plot (consistent with other scripts)
+create_paired_median_plot <- function(metabolite_col) {
+  metabolite_name <- gsub("\\.", " ", metabolite_col)
+  paired_met <- create_paired_data(metabolite_col)
+  if (nrow(paired_met) < 3) return(NULL)
+
+  # Compute paired p-values for display
+  p_t <- tryCatch(t.test(paired_met$`active-2R`, paired_met$`pre-2R`, paired = TRUE)$p.value,
+                  error = function(e) NA_real_)
+  p_w <- tryCatch(wilcox.test(paired_met$`active-2R`, paired_met$`pre-2R`, paired = TRUE, exact = FALSE)$p.value,
+                  error = function(e) NA_real_)
+
+  # Long format for plotting medians + paired lines
+  paired_long <- paired_met %>%
+    select(H, `pre-2R`, `active-2R`) %>%
+    pivot_longer(cols = c(`pre-2R`, `active-2R`), names_to = "timepoint", values_to = "value") %>%
+    mutate(timepoint = factor(timepoint, levels = c("pre-2R", "active-2R")))
+
+  med_pre <- median(paired_met$`pre-2R`, na.rm = TRUE)
+  med_active <- median(paired_met$`active-2R`, na.rm = TRUE)
+
+  subtitle_txt <- paste0(
+    "n = ", nrow(paired_met),
+    " pairs; Median pre-2R = ", round(med_pre, 2),
+    ", Median active-2R = ", round(med_active, 2),
+    "\nPaired t p = ", ifelse(is.na(p_t), "NA", format(p_t, digits = 3)),
+    "; Wilcoxon p = ", ifelse(is.na(p_w), "NA", format(p_w, digits = 3))
+  )
+
+  ggplot(paired_long, aes(x = timepoint, y = value)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.35, fill = "gray80") +
+    geom_line(aes(group = H), alpha = 0.5, color = "gray60") +
+    geom_point(aes(group = H), alpha = 0.75, size = 2) +
+    stat_summary(fun = median, geom = "point", color = "red", size = 3) +
+    stat_summary(fun = median, geom = "line", aes(group = 1), color = "red", linewidth = 1) +
+    labs(
+      title = paste("Paired Median Plot:", metabolite_name),
+      subtitle = subtitle_txt,
+      x = NULL,
+      y = "Concentration"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 12),
+      axis.text.x = element_text(face = "bold")
+    )
+}
+
+# Create plots for significant metabolites
+significant_metabolites <- paired_results %>%
+  filter(Paired_t_pvalue_adj < 0.05 | Wilcoxon_pvalue_adj < 0.05) %>%
+  pull(Metabolite)
+
+# Also create exploratory plots for suggestive metabolites (unadjusted p < 0.1)
+suggestive_metabolites <- paired_results %>%
+  filter((!is.na(Paired_t_pvalue) & Paired_t_pvalue < 0.1) | (!is.na(Wilcoxon_pvalue) & Wilcoxon_pvalue < 0.1)) %>%
+  arrange(pmin(Paired_t_pvalue, Wilcoxon_pvalue, na.rm = TRUE)) %>%
+  pull(Metabolite)
+
+plot_dir_sig <- file.path(output_dir, "Plots_FDR0.05")
+plot_dir_p01 <- file.path(output_dir, "Plots_p0.1_unadjusted")
+if (!dir.exists(plot_dir_sig)) dir.create(plot_dir_sig, recursive = TRUE)
+if (!dir.exists(plot_dir_p01)) dir.create(plot_dir_p01, recursive = TRUE)
+
+if (length(significant_metabolites) > 0) {
+  for (met_name in significant_metabolites) {
+    met_col <- gsub(" ", "\\.", met_name)
+    if (met_col %in% metabolite_cols) {
+      plot <- create_paired_plot(met_col)
+      plot_med <- create_paired_median_plot(met_col)
+      if (!is.null(plot)) {
+        safe_filename <- gsub("[^A-Za-z0-9_-]", "_", met_name)
+        ggsave(file.path(plot_dir_sig, paste0(safe_filename, "_paired_FDR0.05.png")), 
+               plot, width = 12, height = 8, dpi = 300)
+      }
+      if (!is.null(plot_med)) {
+        safe_filename <- gsub("[^A-Za-z0-9_-]", "_", met_name)
+        ggsave(file.path(plot_dir_sig, paste0(safe_filename, "_paired_median_FDR0.05.png")), 
+               plot_med, width = 8, height = 6, dpi = 300)
+      }
+    }
+  }
+  cat("Created paired plots for", length(significant_metabolites), "significant metabolites (FDR < 0.05)\n")
+} else {
+  cat("No metabolites reached significance threshold (FDR < 0.05) for plotting\n")
+}
+
+if (length(suggestive_metabolites) > 0) {
+  # limit to top 15 to avoid generating too many plots
+  n_plot <- min(15, length(suggestive_metabolites))
+  suggestive_top <- suggestive_metabolites[seq_len(n_plot)]
+
+  for (met_name in suggestive_top) {
+    met_col <- gsub(" ", "\\.", met_name)
+    if (met_col %in% metabolite_cols) {
+      plot <- create_paired_plot(met_col)
+      plot_med <- create_paired_median_plot(met_col)
+      if (!is.null(plot)) {
+        safe_filename <- gsub("[^A-Za-z0-9_-]", "_", met_name)
+        ggsave(file.path(plot_dir_p01, paste0(safe_filename, "_paired_p0.1.png")), 
+               plot, width = 12, height = 8, dpi = 300)
+      }
+      if (!is.null(plot_med)) {
+        safe_filename <- gsub("[^A-Za-z0-9_-]", "_", met_name)
+        ggsave(file.path(plot_dir_p01, paste0(safe_filename, "_paired_median_p0.1.png")), 
+               plot_med, width = 8, height = 6, dpi = 300)
+      }
+    }
+  }
+  cat("Created paired plots for", n_plot, "suggestive metabolites (unadjusted p < 0.1). Saved to:", plot_dir_p01, "\n")
+} else {
+  cat("No metabolites reached suggestive threshold (unadjusted p < 0.1) for plotting\n")
+}
+
+# ============================================================================
+# STEP 5: SUMMARY VISUALIZATION
+# ============================================================================
+
+cat("\nStep 5: Creating summary visualizations...\n")
+
+# Volcano plot of paired results
+volcano_plot <- ggplot(paired_results, aes(x = Effect_Size, y = -log10(Paired_t_pvalue_adj))) +
+  geom_point(aes(color = Paired_t_pvalue_adj < 0.05), alpha = 0.7, size = 2) +
+  scale_color_manual(values = c("FALSE" = "gray", "TRUE" = "red")) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "blue") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray") +
+  labs(
+    title = "Paired Analysis: Pre-2R vs Active-2R",
+    x = "Effect Size (Cohen's d)",
+    y = "-log10(Adjusted P-value)",
+    color = "Significant\n(FDR < 0.05)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.position = "bottom"
+  )
+
+ggsave(file.path(output_dir, "Paired_Volcano_Plot.png"), 
+       volcano_plot, width = 10, height = 8, dpi = 300)
+
+# Effect size distribution
+effect_plot <- ggplot(paired_results, aes(x = Effect_Size)) +
+  geom_histogram(bins = 15, alpha = 0.7, fill = "steelblue", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+  labs(
+    title = "Distribution of Effect Sizes",
+    subtitle = "Paired Pre-2R vs Active-2R Analysis",
+    x = "Effect Size (Cohen's d)",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 14, face = "bold"))
+
+ggsave(file.path(output_dir, "Effect_Size_Distribution.png"), 
+       effect_plot, width = 10, height = 6, dpi = 300)
+
+# ============================================================================
+# STEP 6: DETAILED PATIENT TRAJECTORIES
+# ============================================================================
+
+cat("\nStep 6: Creating detailed patient trajectory plot...\n")
+
+# Create a comprehensive trajectory plot for all patients
+all_trajectories <- paired_samples %>%
+  filter(H %in% patients_with_both$H) %>%
+  select(H, Sample_Category, all_of(metabolite_cols)) %>%
+  pivot_longer(cols = all_of(metabolite_cols), 
+               names_to = "Metabolite", values_to = "Concentration") %>%
+  mutate(
+    Metabolite = gsub("\\.", " ", Metabolite),
+    Sample_Category = factor(Sample_Category, levels = c("pre-2R", "active-2R"))
+  )
+
+# Plot trajectories for top significant metabolites
+top_metabolites <- head(significant_metabolites, 6)
+if (length(top_metabolites) > 0) {
+  trajectory_plot <- all_trajectories %>%
+    filter(Metabolite %in% top_metabolites) %>%
+    ggplot(aes(x = Sample_Category, y = Concentration, group = H)) +
+    geom_line(alpha = 0.5, color = "gray") +
+    geom_point(alpha = 0.7) +
+    stat_summary(fun = mean, geom = "line", aes(group = 1), 
+                 color = "red", size = 1.2, alpha = 0.8) +
+    stat_summary(fun = mean, geom = "point", color = "red", size = 2) +
+    facet_wrap(~ Metabolite, scales = "free_y", ncol = 3) +
+    labs(
+      title = "Patient Trajectories: Pre-2R to Active-2R",
+      subtitle = "Gray lines = individual patients, Red line = mean trajectory",
+      x = "Sample Type",
+      y = "Concentration"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      strip.text = element_text(size = 10, face = "bold"),
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+  
+  ggsave(file.path(output_dir, "Patient_Trajectories_Significant.png"), 
+         trajectory_plot, width = 15, height = 10, dpi = 300)
+}
+
+# ============================================================================
+# FINAL SUMMARY
+# ============================================================================
+
+cat("\n=== PAIRED ANALYSIS COMPLETE ===\n")
+cat("Results saved to:", output_dir, "\n")
+cat("Key findings:\n")
+cat("- Patients with paired samples:", nrow(patients_with_both), "\n")
+cat("- Metabolites tested:", nrow(paired_results), "\n")
+cat("- Significant by paired t-test (FDR < 0.05):", 
+    sum(paired_results$Paired_t_pvalue_adj < 0.05, na.rm = TRUE), "\n")
+cat("- Significant by Wilcoxon test (FDR < 0.05):", 
+    sum(paired_results$Wilcoxon_pvalue_adj < 0.05, na.rm = TRUE), "\n")
+
+if (nrow(patients_with_both) > 0) {
+  cat("\nThis paired analysis controls for patient-level confounders by comparing\n")
+  cat("changes within the same individuals from pre-2R to active-2R state.\n")
+}
+
+cat("\n=== SCRIPT COMPLETE ===\n")
