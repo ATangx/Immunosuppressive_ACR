@@ -7,11 +7,166 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r load-source, include=FALSE}
-# Set working directory FIRST
-knitr::opts_knit$set(root.dir = here::here())
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE,   message = FALSE)
+# Make console output wrap nicely in PDF/Word
 options(width = 80)
+```
 
+```{r load-libraries}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(officer)
+  library(patchwork)
+  library(scales)
+  library(gtsummary)
+  library(flextable)
+})
+```
+
+# Data Import and Cleaning
+```{r data-cleaning-setup}
+
+# Import feature table with metadata and set up tables for comparisons
+    data_path <- "/Users/ailintang/Desktop/Immunosuppressive_ACR/Immunosuppressive metabolites feature table"
+    metabolite_data <- as_tibble(read.csv(file.path(data_path, "IS_metabolites_ACR.csv")))
+    
+# Convert log2 data back to non-log2 for visualization
+    nonlog2_data <- metabolite_data %>% 
+      mutate(across(6:ncol(.), ~ 2^.x))
+      # Convert log2 data back to non-log2 in order to interpret/visualize metabolite levels. log2 normality is only needed for statistical testing, as it normalizes distributions and makes fold changes symmetric
+```
+
+## Data Overview and Checks
+```{r data-overview}
+    # check how many patients
+    num_patients <- nonlog2_data %>% summarise(total = n_distinct(H))
+    cat("Number of unique patients:", num_patients$total, "\n")  
+      # n=57
+
+    # check total number of samples that are 2R+
+    num_samples_2R <- nonlog2_data %>%
+      filter(grepl("^2R", as.character(!!sym("ACR")), ignore.case = TRUE)) %>%
+      nrow()
+    cat("Total number of samples that are 2R+:", num_samples_2R, "\n")
+
+    # check total number of samples
+    total_samples <- nrow(nonlog2_data)
+    cat("Total number of samples in dataset:", total_samples, "\n")
+```
+
+## Create Group of Patients with at least one 2R Episode
+```{r patients-with-2R}
+  #+ Create table of patients with at least one 2R episode
+    patients_with_2R <- nonlog2_data %>%
+      mutate(is_2R = grepl("^2R", as.character(!!sym("ACR")), ignore.case = TRUE)) %>%
+      group_by_at(vars(all_of("H"))) %>%
+      filter(any(is_2R)) %>%
+      ungroup() %>%
+      select(-is_2R)
+```
+
+```{r check-patients-with-2R}
+    # check how many patients with 2R
+    num_patients_2R <- patients_with_2R %>%
+      group_by_at(vars(all_of("H"))) %>%
+      summarise(n = n_distinct(!!sym("H"))) %>%
+      ungroup() %>%
+      summarise(total = sum(n))
+    cat("Number of unique patients with at least one 2R episode:", num_patients_2R$total, "\n")
+    # n=18  
+
+    # check total number of samples in patients_with_2R
+    total_samples_with_2R <- nrow(patients_with_2R)
+    cat("Total number of samples in patients with at least one 2R episode:", total_samples_with_2R, "\n")
+    # n=133
+
+```
+
+## Create ACR Status Group Classifications within Patients with 2R Episodes
+```{r create-ACR-groups}
+#- === Create tables by ACR status - Different Classifications===
+  #+ Create tables by ACR status using non-log2 data for visualization
+    acr_0r <- patients_with_2R %>%
+      filter(ACR == "0R") %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+    acr_1r <- patients_with_2R %>%
+      filter(ACR == "1R") %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+    acr_0_1r <- patients_with_2R %>%
+      filter(ACR %in% c("0R", "1R")) %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+    acr_2r <- patients_with_2R %>%
+      filter(ACR == "2R+") %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+
+  #+ Create tables using log2 data for statistical testing
+    acr_0r_log2 <- metabolite_data %>%
+      filter(H %in% patients_with_2R$H) %>%
+      filter(ACR == "0R") %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+    acr_1r_log2 <- metabolite_data %>%
+      filter(H %in% patients_with_2R$H) %>%
+      filter(ACR == "1R") %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+    acr_0_1r_log2 <- metabolite_data %>%
+      filter(H %in% patients_with_2R$H) %>%
+      filter(ACR %in% c("0R", "1R")) %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+    acr_2r_log2 <- metabolite_data %>%
+      filter(H %in% patients_with_2R$H) %>%
+      filter(ACR == "2R+") %>%
+      select(-H, -S, -POD, -Sample_ID, -ACR)
+
+    # show counts
+    cat("Counts by ACR status among patient samples:\n")
+    cat("  0R:", nrow(acr_0r), "\n")
+    cat("  1R:", nrow(acr_1r), "\n")
+    cat("  0R + 1R:", nrow(acr_0_1r), "\n")
+    cat("  2R:", nrow(acr_2r), "\n")
+      # > cat("  0R:", nrow(acr_0r), "\n")
+      #   0R: 43 
+      # > cat("  1R:", nrow(acr_1r), "\n")
+      #   1R: 68 
+      # > cat("  0R + 1R:", nrow(acr_0_1r), "\n")
+      #   0R + 1R: 111 
+      # > cat("  2R:", nrow(acr_2r), "\n")
+      #   2R: 22 
+
+  #+ Classify data points by pre-2R, active 2R, post-2R
+    #! defines "active 2R" as ANY 2R episode (row with ACR matching /^2R/i) per patient,
+    #! "post-2R" as the immediate next row after a 2R episode if NOT itself 2R,
+    #! and "pre-2R" as all remaining rows.
+    
+    df2 <- patients_with_2R %>%
+      mutate(.orig_row = row_number()) %>%
+      # Group by patient
+      group_by_at(vars(all_of("H"))) %>%
+      # Arrange by POD/time if present, otherwise by original order
+      { if ("POD" %in% names(.)) arrange(., POD, .orig_row) else arrange(., .orig_row) } %>%
+      # Classify rows as active/post/pre 2R
+      mutate(rn = row_number(),
+             is_2R = grepl("^2R", as.character(!!sym("ACR")), ignore.case = TRUE),
+             # active_2R: row itself is 2R
+             is_active2R = is_2R,
+             # post_2R: row immediately follows a 2R row AND is not itself 2R
+             is_2R_lag = lag(is_2R, default = FALSE),
+             is_post2R = is_2R_lag & !is_2R) %>%
+      ungroup() %>%
+      select(-is_2R, -is_2R_lag)
+
+      # Final tables (restore original columns only)
+      drop_flags <- c('.orig_row','is_active2R','is_post2R')
+      active_2R <- df2 %>% filter(is_active2R) %>% select(-one_of(drop_flags))
+      post_2R   <- df2 %>% filter(is_post2R)   %>% select(-one_of(drop_flags))
+      pre_2R    <- df2 %>% filter(!(is_active2R | is_post2R)) %>% select(-one_of(drop_flags))
+
+      # Expose the three tables in the global environment (names requested: pre_2R, active_2R, post_2R)
+      pre_2R$ACR_Label <- "pre 2R"
+      active_2R$ACR_Label <- "active 2R"
+      post_2R$ACR_Label <- "post 2R"
+
+```
 # Safe suppression without sink
 local({
   # Store original functions
