@@ -9,8 +9,7 @@
   suppressMessages(suppressWarnings({
     source("Immunosuppressive metabolites feature table/Scripts/01_libraries")
     source("Immunosuppressive metabolites feature table/Scripts/02_setup") 
-    source("Immunosuppressive metabolites feature table/Scripts/03a_plotting_functions")
-    source("Immunosuppressive metabolites feature table/Scripts/03b_tests_plot")
+    source("Immunosuppressive metabolites feature table/Scripts/03a_plot_functions")
     source("Immunosuppressive metabolites feature table/Scripts/03_tests")
   }))
   
