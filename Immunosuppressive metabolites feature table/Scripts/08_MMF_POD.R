@@ -1,4 +1,4 @@
-# Simplified MMF Analysis with POD Stratification
+# Simplified MMF Analysis with POD Stratification (Feedback Q1 and Q2)
 
 # Load data (run 00_source first)
 # source("Immunosuppressive metabolites feature table/Scripts/00_source")
@@ -63,7 +63,7 @@ p_overall <- ggplot(mmf_long, aes(x = ACR_Group, y = Level, fill = ACR_Group)) +
     theme(legend.position = "none")
 
 print(p_overall)
-ggsave("Results2/Feedback_Analysis/MMF_Overall.png", p_overall, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Overall.png", p_overall, 
        width = 10, height = 6, dpi = 300)
 
 # ============================================================================
@@ -121,16 +121,16 @@ analyze_stratum <- function(data, stratum) {
 }
 
 # Run for each stratum
-dir.create("Results2/Feedback_Analysis", showWarnings = FALSE, recursive = TRUE)
+dir.create("Results2/Feedback_Analysis/POD_Stratified_new", showWarnings = FALSE, recursive = TRUE)
 
 early_results <- analyze_stratum(mmf_data, "Early (≤30 days)")
 print(early_results$plot)
-ggsave("Results2/Feedback_Analysis/MMF_Early.png", early_results$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Early.png", early_results$plot, 
        width = 10, height = 6, dpi = 300)
 
 late_results <- analyze_stratum(mmf_data, "Late (>30 days)")
 print(late_results$plot)
-ggsave("Results2/Feedback_Analysis/MMF_Late.png", late_results$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Late.png", late_results$plot, 
        width = 10, height = 6, dpi = 300)
 
 # ============================================================================
@@ -158,12 +158,12 @@ mmf_data_pod10plus <- mmf_data_pod10plus %>%
 # Run for each stratum (using the same analyze_stratum function)
 early_results_pod10 <- analyze_stratum(mmf_data_pod10plus, "Early (10-30 days)")
 print(early_results_pod10$plot)
-ggsave("Results2/Feedback_Analysis/MMF_Early_POD10plus.png", early_results_pod10$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Early_POD10plus.png", early_results_pod10$plot, 
        width = 10, height = 6, dpi = 300)
 
 late_results_pod10 <- analyze_stratum(mmf_data_pod10plus, "Late (>30 days)")
 print(late_results_pod10$plot)
-ggsave("Results2/Feedback_Analysis/MMF_Late_POD10plus.png", late_results_pod10$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Late_POD10plus.png", late_results_pod10$plot, 
        width = 10, height = 6, dpi = 300)
 
 # ============================================================================
@@ -192,12 +192,12 @@ mmf_data_pod10_45 <- mmf_data_pod10_45 %>%
 # Run for each stratum
 early_results_pod10_45 <- analyze_stratum(mmf_data_pod10_45, "Early (10-30 days)")
 print(early_results_pod10_45$plot)
-ggsave("Results2/Feedback_Analysis/MMF_Early_POD10_45.png", early_results_pod10_45$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Early_POD10_45.png", early_results_pod10_45$plot, 
        width = 10, height = 6, dpi = 300)
 
 late_results_pod10_45 <- analyze_stratum(mmf_data_pod10_45, "Late (31-45 days)")
 print(late_results_pod10_45$plot)
-ggsave("Results2/Feedback_Analysis/MMF_Late_POD10_45.png", late_results_pod10_45$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Late_POD10_45.png", late_results_pod10_45$plot, 
        width = 10, height = 6, dpi = 300)
 
 # ============================================================================
@@ -219,7 +219,7 @@ cat("Early 10-45d: C18 p=", round(early_results_pod10_45$p_c18, 3),
     ", HILIC p=", round(early_results_pod10_45$p_hilic, 3), "\n")
 cat("Late 31-45d:  C18 p=", round(late_results_pod10_45$p_c18, 3), 
     ", HILIC p=", round(late_results_pod10_45$p_hilic, 3), "\n")
-cat("\nPlots saved to: Results2/Feedback_Analysis/\n")
+cat("\nPlots saved to: Results2/Feedback_Analysis/POD_Stratified_new/\n")
 cat("- MMF_Overall.png\n")
 cat("- MMF_Early.png\n")
 cat("- MMF_Late.png\n")
@@ -277,7 +277,7 @@ p_mpa_overall <- ggplot(mpa_data, aes(x = ACR_Group, y = `Mycophenolic.acid.O.ac
     theme(legend.position = "none")
 
 print(p_mpa_overall)
-ggsave("Results2/Feedback_Analysis/MPA_Overall.png", p_mpa_overall, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Overall.png", p_mpa_overall, 
        width = 8, height = 6, dpi = 300)
 
 # ============================================================================
@@ -327,12 +327,12 @@ analyze_stratum_mpa <- function(data, stratum) {
 # Run for each stratum
 early_mpa <- analyze_stratum_mpa(mpa_data, "Early (≤30 days)")
 print(early_mpa$plot)
-ggsave("Results2/Feedback_Analysis/MPA_Early.png", early_mpa$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Early.png", early_mpa$plot, 
        width = 8, height = 6, dpi = 300)
 
 late_mpa <- analyze_stratum_mpa(mpa_data, "Late (>30 days)")
 print(late_mpa$plot)
-ggsave("Results2/Feedback_Analysis/MPA_Late.png", late_mpa$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Late.png", late_mpa$plot, 
        width = 8, height = 6, dpi = 300)
 
 # ============================================================================
@@ -360,12 +360,12 @@ mpa_data_pod10plus <- mpa_data_pod10plus %>%
 # Run for each stratum
 early_mpa_pod10 <- analyze_stratum_mpa(mpa_data_pod10plus, "Early (10-30 days)")
 print(early_mpa_pod10$plot)
-ggsave("Results2/Feedback_Analysis/MPA_Early_POD10plus.png", early_mpa_pod10$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Early_POD10plus.png", early_mpa_pod10$plot, 
        width = 8, height = 6, dpi = 300)
 
 late_mpa_pod10 <- analyze_stratum_mpa(mpa_data_pod10plus, "Late (>30 days)")
 print(late_mpa_pod10$plot)
-ggsave("Results2/Feedback_Analysis/MPA_Late_POD10plus.png", late_mpa_pod10$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Late_POD10plus.png", late_mpa_pod10$plot, 
        width = 8, height = 6, dpi = 300)
 
 # ============================================================================
@@ -394,12 +394,12 @@ mpa_data_pod10_45 <- mpa_data_pod10_45 %>%
 # Run for each stratum
 early_mpa_pod10_45 <- analyze_stratum_mpa(mpa_data_pod10_45, "Early (10-30 days)")
 print(early_mpa_pod10_45$plot)
-ggsave("Results2/Feedback_Analysis/MPA_Early_POD10_45.png", early_mpa_pod10_45$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Early_POD10_45.png", early_mpa_pod10_45$plot, 
        width = 8, height = 6, dpi = 300)
 
 late_mpa_pod10_45 <- analyze_stratum_mpa(mpa_data_pod10_45, "Late (31-45 days)")
 print(late_mpa_pod10_45$plot)
-ggsave("Results2/Feedback_Analysis/MPA_Late_POD10_45.png", late_mpa_pod10_45$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Late_POD10_45.png", late_mpa_pod10_45$plot, 
        width = 8, height = 6, dpi = 300)
 
 # ============================================================================
@@ -421,7 +421,7 @@ cat("3. POD 10-45 only (excluding POD<10 and POD>45):\n")
 cat("   Early 10-30d:  p=", round(early_mpa_pod10_45$p_value, 3), "\n")
 cat("   Late 31-45d:   p=", round(late_mpa_pod10_45$p_value, 3), "\n\n")
 
-cat("MPA-Glucuronide plots saved to: Results2/Feedback_Analysis/\n")
+cat("MPA-Glucuronide plots saved to: Results2/Feedback_Analysis/POD_Stratified_new/\n")
 cat("Original stratification:\n")
 cat("  - MPA_Overall.png\n")
 cat("  - MPA_Early.png\n")

@@ -1,4 +1,4 @@
-# Race-Stratified Analysis: 0R vs 2R+ Mycophenolate Levels
+# Race-Stratified Analysis: 0R vs 2R+ Mycophenolate Levels (Feedback Q3)
 
 # Load data (run 00_source first)
 # source("Immunosuppressive metabolites feature table/Scripts/00_source")
@@ -121,7 +121,7 @@ races <- unique(mmf_race_data$Race[!is.na(mmf_race_data$Race)])
 cat("Races to analyze:", paste(races, collapse = ", "), "\n")
 
 # Create output directory
-dir.create("Results2/Race_Stratified", showWarnings = FALSE, recursive = TRUE)
+dir.create("Results2/Feedback_Analysis/Race_Stratified", showWarnings = FALSE, recursive = TRUE)
 
 # Run analysis for each race (store results, don't print yet)
 race_results <- list()
@@ -135,7 +135,7 @@ for(race in races) {
 # Save all plots
 cat("\n=== SAVING PLOTS ===\n")
 for(race in names(race_results)) {
-    filename <- paste0("Results2/Race_Stratified/MMF_", 
+    filename <- paste0("Results2/Feedback_Analysis/Race_Stratified/MMF_", 
                       gsub(" ", "_", race), "_0R_vs_2R.png")
     ggsave(filename, race_results[[race]]$plot, width = 10, height = 6, dpi = 300)
     cat("Saved:", filename, "\n")
@@ -159,8 +159,8 @@ if(length(race_results) > 0) {
     print(summary_df)
     
     # Save summary table
-    write_csv(summary_df, "Results2/Race_Stratified/Race_Stratified_Summary.csv")
-    cat("\nSummary table saved to: Results2/Race_Stratified/Race_Stratified_Summary.csv\n")
+    write_csv(summary_df, "Results2/Feedback_Analysis/Race_Stratified/Race_Stratified_Summary.csv")
+    cat("\nSummary table saved to: Results2/Feedback_Analysis/Race_Stratified/Race_Stratified_Summary.csv\n")
 }
 
 # ============================================================================
@@ -189,7 +189,7 @@ p_combined <- ggplot(mmf_race_long, aes(x = ACR_Group, y = Level, fill = ACR_Gro
           axis.text.x = element_text(angle = 45, hjust = 1))
 
 print(p_combined)
-ggsave("Results2/Race_Stratified/MMF_All_Races_Combined.png", p_combined, 
+ggsave("Results2/Feedback_Analysis/Race_Stratified/MMF_All_Races_Combined.png", p_combined, 
        width = 12, height = 8, dpi = 300)
 
 cat("\n=== DISPLAYING ALL RACE-STRATIFIED PLOTS ===\n")
@@ -203,7 +203,7 @@ for(race in names(race_results)) {
 
 cat("\n✓ All", length(race_results), "race-stratified plots displayed.\n")
 cat("✓ Use the ← → arrow buttons in the Plots pane to navigate.\n")
-cat("✓ Files saved to: Results2/Race_Stratified/\n\n")
+cat("✓ Files saved to: Results2/Feedback_Analysis/Race_Stratified/\n\n")
 
-cat("All plots saved to: Results2/Race_Stratified/\n\n")
+cat("All plots saved to: Results2/Feedback_Analysis/Race_Stratified/\n\n")
 cat("Analysis complete!\n")
