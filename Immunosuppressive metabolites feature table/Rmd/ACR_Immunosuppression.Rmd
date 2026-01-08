@@ -13,6 +13,9 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE,   message = FALSE)
 options(width = 80)
 ```
 
+# Data setup
+
+## Load Libraries
 ```{r load-libraries}
 suppressPackageStartupMessages({
   library(tidyverse)
@@ -24,7 +27,7 @@ suppressPackageStartupMessages({
 })
 ```
 
-# Data Import and Cleaning
+## Data Import and Cleaning
 ```{r data-cleaning-setup}
 
 # Import feature table with metadata and set up tables for comparisons
@@ -167,60 +170,3 @@ suppressPackageStartupMessages({
       post_2R$ACR_Label <- "post 2R"
 
 ```
-# Safe suppression without sink
-local({
-  # Store original functions
-  original_cat <- cat
-  original_print <- print
-  original_message <- message
-  original_warning <- warning
-  
-  # Override all output functions to do nothing
-  assign("cat", function(...) invisible(NULL), envir = .GlobalEnv)
-  assign("print", function(...) invisible(NULL), envir = .GlobalEnv)
-  assign("message", function(...) invisible(NULL), envir = .GlobalEnv)
-  assign("warning", function(...) invisible(NULL), envir = .GlobalEnv)
-  
-  # Capture any remaining output
-  invisible(capture.output({
-    suppressMessages(suppressWarnings({
-      source("Immunosuppressive metabolites feature table/Scripts/00_source")
-    }))
-  }))
-  
-  # Restore original functions
-  assign("cat", original_cat, envir = .GlobalEnv)
-  assign("print", original_print, envir = .GlobalEnv)
-  assign("message", original_message, envir = .GlobalEnv)
-  assign("warning", original_warning, envir = .GlobalEnv)
-})
-```
-
-# Load Source Script
-This includes all library imports, data imports/setup/cleaning, and plot functions.
-The data has been set up to filter to only patients who have had at least one "2R+" ACR event.
-ACR status variables have been defined in the source script as well for 1)non-log2 data visualizations, 2)log2 statistical analyses, and 3)classification of pre-2R, active-2R, post-2R samples arranged by POD
-
-```{r load-source}
-# source("Immunosuppressive metabolites feature table/Scripts/00_source")
-```
-
-# Patient-Level Analysis of Immunosuppressive Metabolites
-
-## In ALL patients, compare patients who NEVER had 2R+ vs patients who HAD at least one 2R+ episode (using all patients in the dataset)
-```{r}
-
-
-```
-
-### In ALL patients, compare NEVER 2R+ vs HAD 2R+ but exclude samples taken during active 2R+ episodes and post-2R+
-
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
-# Source the script
-source("Immunosuppressive metabolites feature table/Scripts/05c_PatientLevel_BaselineOnly")
-
-# Display the volcano plot
-knitr::include_graphics("Immunosuppressive metabolites feature table/Results/PatientLevel_5c_BaselineOnly/baseline_patient_volcano_plot.png")
-```
-
-## Within patients who experienced rejection (at least one event of "2R+"), compare pre-2R vs post-2R samples (0R/1R samples vs 2R+ samples)
