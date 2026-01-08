@@ -135,6 +135,8 @@ perform_pod_mmf_analysis <- function(data, strata_list) {
         # Create plots using plot_ttest_bars function from 03a_plotting_functions
         if(exists("plot_ttest_bars")) {
             cat("Creating plots for", nrow(mmf_results), "metabolites...\n")
+            cat("Metabolites to plot:", paste(mmf_results$Metabolite, collapse = ", "), "\n")
+            cat("Data columns available:", paste(names(acr_0r_mmf), collapse = ", "), "\n")
             
             stratum_plots <- plot_ttest_bars(
                 sig_results = mmf_results,
@@ -144,6 +146,7 @@ perform_pod_mmf_analysis <- function(data, strata_list) {
             )
             
             cat("Generated", length(stratum_plots), "plots\n")
+            cat("Plot names:", paste(names(stratum_plots), collapse = ", "), "\n")
             
             # Save plots for this stratum
             dir.create("Results2/Feedback_Analysis/POD_Stratified", 
@@ -157,9 +160,6 @@ perform_pod_mmf_analysis <- function(data, strata_list) {
                     ggsave(filename, stratum_plots[[metabolite]], 
                           width = 8, height = 6, dpi = 300)
                     cat("Saved plot:", filename, "\n")
-                    
-                    # Display the plot in viewer
-                    print(stratum_plots[[metabolite]])
                 }
                 
                 all_plots[[stratum_name]] <- stratum_plots
@@ -182,6 +182,8 @@ pod_mmf_analysis <- perform_pod_mmf_analysis(
     data = patients_with_2R,  # Use the subset with 2R+ patients
     strata_list = pod_strata
 )
+
+
 
 # Export combined results
 if(length(pod_mmf_analysis$results) > 0) {
@@ -207,5 +209,25 @@ if(exists("pod_mmf_analysis") && length(pod_mmf_analysis$results) > 0) {
 } else {
     cat("\nWARNING: No results were generated. Check your data and POD ranges.\n")
 }
+
+# Display all plots in viewer
+if(!is.null(pod_mmf_analysis$plots) && length(pod_mmf_analysis$plots) > 0) {
+    cat("\n=== DISPLAYING ALL POD-STRATIFIED PLOTS ===\n")
+    cat("Total plots generated:", sum(sapply(pod_mmf_analysis$plots, length)), "\n")
+    cat("All plots saved to: Results2/Feedback_Analysis/POD_Stratified/\n\n")
+    
+    # Display all plots (they go into plot history)
+    for(stratum_name in names(pod_mmf_analysis$plots)) {
+        for(metabolite in names(pod_mmf_analysis$plots[[stratum_name]])) {
+            cat("Displaying:", stratum_name, "-", metabolite, "\n")
+            print(pod_mmf_analysis$plots[[stratum_name]][[metabolite]])
+        }
+    }
+    
+    cat("\n✓ All", sum(sapply(pod_mmf_analysis$plots, length)), "plots displayed.\n")
+    cat("✓ Use the ← → arrow buttons in the Plots pane to navigate.\n")
+    cat("✓ Files saved to: Results2/Feedback_Analysis/POD_Stratified/\n\n")
+}
+
 
 
