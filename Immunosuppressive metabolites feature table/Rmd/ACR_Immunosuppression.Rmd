@@ -33,7 +33,8 @@ suppressPackageStartupMessages({
 # Import feature table with metadata and set up tables for comparisons
     data_path <- "/Users/ailintang/Desktop/Immunosuppressive_ACR/Immunosuppressive metabolites feature table"
     metabolite_data <- as_tibble(read.csv(file.path(data_path, "IS_metabolites_ACR.csv")))
-    
+    clinical_data <- read_csv("/Users/ailintang/Desktop/Immunosuppressive_ACR/OHT_Clinical.csv")
+
 # Convert log2 data back to non-log2 for visualization
     nonlog2_data <- metabolite_data %>% 
       mutate(across(6:ncol(.), ~ 2^.x))
@@ -171,80 +172,623 @@ suppressPackageStartupMessages({
 
 ```
 
-# Plotting Function
-```{r plotting-function}
-plot_ttest_bars <- function(sig_results, group1_data, group2_data, use_median = FALSE) {
-  
-  plot_list <- list()
-  
-  for (i in 1:nrow(sig_results)) {
-    metabolite <- sig_results$Metabolite[i]
+# POD-Stratified Analysis on Mycophenolate Levels 0R vs 2R+
+
+feedback Q1 and Q2
+
+## Overall Comparison of Mycophenolate Levels 0R vs 2R+
+```{r overall-MMF-comparison}
+
+# Get MMF data - filter to keep only 0R and 2R+
+mmf_data <- patients_with_2R %>%
+    filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R"))
+
+# Run Wilcoxon tests
+wilcox_c18 <- wilcox.test(
+    `Mycophenolate..C18.` ~ ACR_Group, 
+    data = mmf_data, 
+    exact = FALSE
+)
+
+wilcox_hilic <- wilcox.test(
+    `Mycophenolate..HILIC.` ~ ACR_Group, 
+    data = mmf_data, 
+    exact = FALSE
+)
+
+# Plot overall comparison
+mmf_long <- mmf_data %>%
+    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
+                 names_to = "Metabolite",
+                 values_to = "Level") %>%
+    mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
+
+# Get sample sizes for x-axis labels
+n_0r_overall <- sum(mmf_data$ACR_Group == "0R")
+n_2r_overall <- sum(mmf_data$ACR_Group == "2R+")
+
+p_overall <- ggplot(mmf_long, aes(x = ACR_Group, y = Level, fill = ACR_Group)) +
+    geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+    geom_jitter(width = 0.2, alpha = 0.5) +
+    stat_summary(fun = median, geom = "point", color = "red", size = 3, shape = 18) +
+    facet_wrap(~ Metabolite, scales = "free_y") +
+    scale_fill_manual(values = c("0R" = "lightblue", "2R+" = "lightcoral")) +
+    scale_x_discrete(labels = c("0R" = paste0("0R\n(n=", n_0r_overall, ")"),
+                                "2R+" = paste0("2R+\n(n=", n_2r_overall, ")"))) +
+    labs(title = "MMF Levels: 0R vs 2R+",
+         subtitle = paste0("C18: p=", round(wilcox_c18$p.value, 3), 
+                          "; HILIC: p=", round(wilcox_hilic$p.value, 3)),
+         x = "ACR Group", y = "Level") +
+    theme_minimal() +
+    theme(legend.position = "none")
+
+print(p_overall)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Overall.png", p_overall, 
+#        width = 10, height = 6, dpi = 300)
+```
+
+## POD-Stratified Analysis (Early ≤30 days vs Late >30 days)
+```{r pod-stratified-analysis-pod30}
+
+# Add POD stratum
+mmf_data <- mmf_data %>%
+    mutate(POD_Stratum = ifelse(POD <= 30, "Early (≤30 days)", "Late (>30 days)"))
+
+# Function to run tests for one stratum
+analyze_stratum <- function(data, stratum) {
+    cat("--- ", stratum, " ---\n")
     
-    # Get the metabolite data
-    met_col <- which(colnames(group1_data) == metabolite)
-    if (length(met_col) == 0) next
+    stratum_data <- data %>% filter(POD_Stratum == stratum)
+    n_0r <- sum(stratum_data$ACR_Group == "0R")
+    n_2r <- sum(stratum_data$ACR_Group == "2R+")
     
-    # Prepare data for plotting
-    group1_values <- group1_data[[met_col]]
-    group2_values <- group2_data[[met_col]]
+    # Wilcoxon tests
+    w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ ACR_Group, 
+                         data = stratum_data, exact = FALSE)
+    w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ ACR_Group, 
+                           data = stratum_data, exact = FALSE)
     
-    # Create combined dataframe for ggplot
-    plot_data <- data.frame(
-      values = c(group1_values, group2_values),
-      group = c(rep("0R/1R", length(group1_values)), 
-                rep("2R+", length(group2_values)))
-    )
+    # Create plot with sample sizes in x-axis labels
+    stratum_long <- stratum_data %>%
+        pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
+                     names_to = "Metabolite", values_to = "Level") %>%
+        mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
     
-    # Remove NA values
-    plot_data <- plot_data[!is.na(plot_data$values), ]
+    p <- ggplot(stratum_long, aes(x = ACR_Group, y = Level, fill = ACR_Group)) +
+        geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+        geom_jitter(width = 0.2, alpha = 0.5) +
+        stat_summary(fun = median, geom = "point", color = "red", size = 3, shape = 18) +
+        facet_wrap(~ Metabolite, scales = "free_y") +
+        scale_fill_manual(values = c("0R" = "lightblue", "2R+" = "lightcoral")) +
+        scale_x_discrete(labels = c("0R" = paste0("0R\n(n=", n_0r, ")"),
+                                    "2R+" = paste0("2R+\n(n=", n_2r, ")"))) +
+        labs(title = paste("MMF Levels:", stratum),
+             subtitle = paste0("C18: p=", round(w_c18$p.value, 3), 
+                              "; HILIC: p=", round(w_hilic$p.value, 3)),
+             x = "ACR Group", y = "Level") +
+        theme_minimal() +
+        theme(legend.position = "none")
     
-    # Calculate summary statistics
-    if (use_median) {
-      summary_data <- plot_data %>%
-        group_by(group) %>%
-        summarise(
-          center = median(values, na.rm = TRUE),
-          .groups = 'drop'
-        )
-      y_label <- paste("Median", metabolite, "Level")
-    } else {
-      summary_data <- plot_data %>%
-        group_by(group) %>%
-        summarise(
-          center = mean(values, na.rm = TRUE),
-          se = sd(values, na.rm = TRUE) / sqrt(n()),
-          .groups = 'drop'
-        )
-      y_label <- paste("Mean", metabolite, "Level")
-    }
-    
-    # Create the plot
-    p <- ggplot(plot_data, aes(x = group, y = values, fill = group)) +
-      geom_boxplot(alpha = 0.7) +
-      geom_jitter(width = 0.2, alpha = 0.5) +
-      stat_summary(fun = ifelse(use_median, median, mean), 
-                   geom = "point", 
-                   size = 3, 
-                   color = "red") +
-      labs(
-        title = paste("Comparison of", metabolite, "levels"),
-        subtitle = paste("p-value =", round(sig_results$p_value[i], 4)),
-        x = "ACR Group",
-        y = y_label
-      ) +
-      theme_minimal() +
-      theme(
-        plot.title = element_text(hjust = 0.5),
-        plot.subtitle = element_text(hjust = 0.5),
-        legend.position = "none"
-      ) +
-      scale_fill_manual(values = c("0R/1R" = "lightblue", "2R+" = "lightcoral"))
-    
-    # Store the plot
-    plot_list[[metabolite]] <- p
-  }
-  
-  return(plot_list)
+    return(list(plot = p, p_c18 = w_c18$p.value, p_hilic = w_hilic$p.value))
 }
 
+# Run for each stratum
+dir.create("Results2/Feedback_Analysis/POD_Stratified_new", showWarnings = FALSE, recursive = TRUE)
+
+early_results <- analyze_stratum(mmf_data, "Early (≤30 days)")
+print(early_results$plot)
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Early.png", early_results$plot, 
+       width = 10, height = 6, dpi = 300)
+
+late_results <- analyze_stratum(mmf_data, "Late (>30 days)")
+print(late_results$plot)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Late.png", late_results$plot, 
+#        width = 10, height = 6, dpi = 300)
+```
+
+## POD-Stratified Analysis EXCLUDING POD<10
+```{r pod-stratified-analysis-pod10plus}
+# Filter out POD<10 samples
+mmf_data_pod10plus <- patients_with_2R %>%
+    filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
+    filter(POD >= 10) %>%  # Exclude POD < 10
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R"))
+
+# Add POD stratum
+mmf_data_pod10plus <- mmf_data_pod10plus %>%
+    mutate(POD_Stratum = ifelse(POD <= 30, "Early (10-30 days)", "Late (>30 days)"))
+
+# Run for each stratum (using the same analyze_stratum function)
+early_results_pod10 <- analyze_stratum(mmf_data_pod10plus, "Early (10-30 days)")
+print(early_results_pod10$plot)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Early_POD10plus.png", early_results_pod10$plot, 
+#        width = 10, height = 6, dpi = 300)
+
+late_results_pod10 <- analyze_stratum(mmf_data_pod10plus, "Late (>30 days)")
+print(late_results_pod10$plot)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Late_POD10plus.png", late_results_pod10$plot, 
+#        width = 10, height = 6, dpi = 300)
+```
+
+
+# POD-Stratified Analysis EXCLUDING POD<10 AND POD>45
+```{r pod-stratified-analysis-pod10-45}
+
+# Filter to POD 10-45 only
+mmf_data_pod10_45 <- patients_with_2R %>%
+    filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
+    filter(POD >= 10 & POD <= 45) %>%  # Keep only POD 10-45
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R"))
+
+# Add POD stratum
+mmf_data_pod10_45 <- mmf_data_pod10_45 %>%
+    mutate(POD_Stratum = ifelse(POD <= 30, "Early (10-30 days)", "Late (31-45 days)"))
+
+# Run for each stratum
+early_results_pod10_45 <- analyze_stratum(mmf_data_pod10_45, "Early (10-30 days)")
+print(early_results_pod10_45$plot)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Early_POD10_45.png", early_results_pod10_45$plot, 
+#        width = 10, height = 6, dpi = 300)
+
+late_results_pod10_45 <- analyze_stratum(mmf_data_pod10_45, "Late (31-45 days)")
+print(late_results_pod10_45$plot)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Late_POD10_45.png", late_results_pod10_45$plot, 
+#        width = 10, height = 6, dpi = 300)
+
+```
+
+# Analysis of Mycophenolic Acid O-Acyl (MPA) Glucuronide Levels 0R vs 2R+
+
+## Overall Analysis on Mycophenolic Acid O-Acyl Glucuronide Levels 0R vs 2R+
+```{r}
+
+# Get MPA-glucuronide data - filter to keep only 0R and 2R+
+mpa_data <- patients_with_2R %>%
+    filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
+    select(H, POD, ACR, `Mycophenolic.acid.O.acyl.glucuronide..C18.`) %>%
+    mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R"))
+
+# Run Wilcoxon test
+wilcox_mpa <- wilcox.test(
+    `Mycophenolic.acid.O.acyl.glucuronide..C18.` ~ ACR_Group, 
+    data = mpa_data, 
+    exact = FALSE
+)
+
+# Plot overall comparison
+n_0r_mpa <- sum(mpa_data$ACR_Group == "0R")
+n_2r_mpa <- sum(mpa_data$ACR_Group == "2R+")
+
+p_mpa_overall <- ggplot(mpa_data, aes(x = ACR_Group, y = `Mycophenolic.acid.O.acyl.glucuronide..C18.`, fill = ACR_Group)) +
+    geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+    geom_jitter(width = 0.2, alpha = 0.5) +
+    stat_summary(fun = median, geom = "point", color = "red", size = 3, shape = 18) +
+    scale_fill_manual(values = c("0R" = "lightblue", "2R+" = "lightcoral")) +
+    scale_x_discrete(labels = c("0R" = paste0("0R\n(n=", n_0r_mpa, ")"),
+                                "2R+" = paste0("2R+\n(n=", n_2r_mpa, ")"))) +
+    labs(title = "MPA-Glucuronide Levels: 0R vs 2R+",
+         subtitle = paste0("p=", round(wilcox_mpa$p.value, 3)),
+         x = "ACR Group", y = "Level") +
+    theme_minimal() +
+    theme(legend.position = "none")
+
+print(p_mpa_overall)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Overall.png", p_mpa_overall, 
+#        width = 8, height = 6, dpi = 300)
+```
+
+## MPA POD-Stratified Analysis (Early ≤30 days vs Late >30 days)
+```{r}
+
+# Add POD stratum
+mpa_data <- mpa_data %>%
+    mutate(POD_Stratum = ifelse(POD <= 30, "Early (≤30 days)", "Late (>30 days)"))
+
+# Function to run tests for one stratum (MPA version)
+analyze_stratum_mpa <- function(data, stratum) {
+    
+    stratum_data <- data %>% filter(POD_Stratum == stratum)
+    n_0r <- sum(stratum_data$ACR_Group == "0R")
+    n_2r <- sum(stratum_data$ACR_Group == "2R+")
+    
+    # Wilcoxon test
+    w_mpa <- wilcox.test(`Mycophenolic.acid.O.acyl.glucuronide..C18.` ~ ACR_Group, 
+                         data = stratum_data, exact = FALSE)
+    
+    cat("MPA-Glucuronide: p =", round(w_mpa$p.value, 3), "\n\n")
+    
+    # Create plot
+    p <- ggplot(stratum_data, aes(x = ACR_Group, y = `Mycophenolic.acid.O.acyl.glucuronide..C18.`, fill = ACR_Group)) +
+        geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+        geom_jitter(width = 0.2, alpha = 0.5) +
+        stat_summary(fun = median, geom = "point", color = "red", size = 3, shape = 18) +
+        scale_fill_manual(values = c("0R" = "lightblue", "2R+" = "lightcoral")) +
+        scale_x_discrete(labels = c("0R" = paste0("0R\n(n=", n_0r, ")"),
+                                    "2R+" = paste0("2R+\n(n=", n_2r, ")"))) +
+        labs(title = paste("MPA-Glucuronide Levels:", stratum),
+             subtitle = paste0("p=", round(w_mpa$p.value, 3)),
+             x = "ACR Group", y = "Level") +
+        theme_minimal() +
+        theme(legend.position = "none")
+    
+    return(list(plot = p, p_value = w_mpa$p.value))
+}
+
+# Run for each stratum
+early_mpa <- analyze_stratum_mpa(mpa_data, "Early (≤30 days)")
+print(early_mpa$plot)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Early.png", early_mpa$plot, 
+#        width = 8, height = 6, dpi = 300)
+
+late_mpa <- analyze_stratum_mpa(mpa_data, "Late (>30 days)")
+print(late_mpa$plot)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Late.png", late_mpa$plot, 
+#        width = 8, height = 6, dpi = 300)
+```
+
+## MPA POD-Stratified Analysis EXCLUDING POD<10
+```{r pod-stratified-analysis-mpa-pod10plus}
+# ============================================================================
+# PART 3: POD-Stratified Analysis EXCLUDING POD<10 (Early 10-30 vs Late >30)
+# ============================================================================
+
+# Filter out POD<10 samples
+mpa_data_pod10plus <- patients_with_2R %>%
+    filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
+    filter(POD >= 10) %>%
+    select(H, POD, ACR, `Mycophenolic.acid.O.acyl.glucuronide..C18.`) %>%
+    mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R"))
+
+# Add POD stratum
+mpa_data_pod10plus <- mpa_data_pod10plus %>%
+    mutate(POD_Stratum = ifelse(POD <= 30, "Early (10-30 days)", "Late (>30 days)"))
+
+# Run for each stratum
+early_mpa_pod10 <- analyze_stratum_mpa(mpa_data_pod10plus, "Early (10-30 days)")
+print(early_mpa_pod10$plot)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Early_POD10plus.png", early_mpa_pod10$plot, 
+#        width = 8, height = 6, dpi = 300)
+
+late_mpa_pod10 <- analyze_stratum_mpa(mpa_data_pod10plus, "Late (>30 days)")
+print(late_mpa_pod10$plot)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Late_POD10plus.png", late_mpa_pod10$plot, 
+#        width = 8, height = 6, dpi = 300)
+```
+
+## MPA POD-Stratified Analysis (Early 10-30 vs Late 31-45)
+```{r pod-stratified-analysis-mpa-pod10-45}
+# Filter to POD 10-45 only
+mpa_data_pod10_45 <- patients_with_2R %>%
+    filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
+    filter(POD >= 10 & POD <= 45) %>%
+    select(H, POD, ACR, `Mycophenolic.acid.O.acyl.glucuronide..C18.`) %>%
+    mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R"))
+
+# Add POD stratum
+mpa_data_pod10_45 <- mpa_data_pod10_45 %>%
+    mutate(POD_Stratum = ifelse(POD <= 30, "Early (10-30 days)", "Late (31-45 days)"))
+
+# Run for each stratum
+early_mpa_pod10_45 <- analyze_stratum_mpa(mpa_data_pod10_45, "Early (10-30 days)")
+print(early_mpa_pod10_45$plot)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Early_POD10_45.png", early_mpa_pod10_45$plot, 
+#        width = 8, height = 6, dpi = 300)
+
+late_mpa_pod10_45 <- analyze_stratum_mpa(mpa_data_pod10_45, "Late (31-45 days)")
+print(late_mpa_pod10_45$plot)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Late_POD10_45.png", late_mpa_pod10_45$plot, 
+#        width = 8, height = 6, dpi = 300)
+```
+
+
+# Race-Stratified Analysis on Mycophenolate Levels 0R vs 2R+
+```{r}
+# Get MMF data and merge with race
+mmf_race_data <- patients_with_2R %>%
+    filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R")) %>%
+    left_join(clinical_data %>% select(H, Race, Age, Sex, BMI), by = "H")
+
+# Function to analyze MMF levels by race
+analyze_by_race <- function(data, race_group) {
+    cat("\n", rep("=", 70), "\n", sep = "")
+    cat("RACE:", race_group, "\n")
+    cat(rep("=", 70), "\n", sep = "")
+    
+    # Filter for this race
+    race_data <- data %>% filter(Race == race_group)
+    
+    n_total <- nrow(race_data)
+    n_0r <- sum(race_data$ACR_Group == "0R")
+    n_2r <- sum(race_data$ACR_Group == "2R+")
+    
+    cat("Total samples:", n_total, "(0R:", n_0r, ", 2R+:", n_2r, ")\n\n")
+    
+    # Check if we have enough samples
+    if(n_0r < 3 | n_2r < 3) {
+        cat("WARNING: Insufficient sample size for analysis (need ≥3 per group)\n")
+        return(NULL)
+    }
+    
+    # Wilcoxon tests for C18
+    cat("--- Mycophenolate C18 ---\n")
+    w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ ACR_Group, 
+                         data = race_data, exact = FALSE)
+    cat("p-value:", round(w_c18$p.value, 4), "\n")
+    cat("Median 0R:", round(median(race_data$`Mycophenolate..C18.`[race_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
+    cat("Median 2R+:", round(median(race_data$`Mycophenolate..C18.`[race_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
+    
+    # Wilcoxon tests for HILIC
+    cat("--- Mycophenolate HILIC ---\n")
+    w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ ACR_Group, 
+                           data = race_data, exact = FALSE)
+    cat("p-value:", round(w_hilic$p.value, 4), "\n")
+    cat("Median 0R:", round(median(race_data$`Mycophenolate..HILIC.`[race_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
+    cat("Median 2R+:", round(median(race_data$`Mycophenolate..HILIC.`[race_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
+    
+    # Create plot
+    race_long <- race_data %>%
+        pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
+                     names_to = "Metabolite",
+                     values_to = "Level") %>%
+        mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
+    
+    p <- ggplot(race_long, aes(x = ACR_Group, y = Level, fill = ACR_Group)) +
+        geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+        geom_jitter(width = 0.2, alpha = 0.5) +
+        stat_summary(fun = median, geom = "point", color = "red", size = 3, shape = 18) +
+        facet_wrap(~ Metabolite, scales = "free_y") +
+        scale_fill_manual(values = c("0R" = "lightblue", "2R+" = "lightcoral")) +
+        scale_x_discrete(labels = c("0R" = paste0("0R\n(n=", n_0r, ")"),
+                                    "2R+" = paste0("2R+\n(n=", n_2r, ")"))) +
+        labs(title = paste("MMF Levels:", race_group, "patients (0R vs 2R+)"),
+             subtitle = paste0("C18: p=", round(w_c18$p.value, 3), 
+                              "; HILIC: p=", round(w_hilic$p.value, 3)),
+             x = "ACR Group", y = "Level") +
+        theme_minimal() +
+        theme(legend.position = "none")
+    
+    return(list(
+        plot = p, 
+        race = race_group,
+        n_0r = n_0r,
+        n_2r = n_2r,
+        p_c18 = w_c18$p.value,
+        p_hilic = w_hilic$p.value
+    ))
+}
+
+# Get unique races with sufficient data
+races <- unique(mmf_race_data$Race[!is.na(mmf_race_data$Race)])
+cat("Races to analyze:", paste(races, collapse = ", "), "\n")
+
+# Create output directory
+dir.create("Results2/Feedback_Analysis/Race_Stratified", showWarnings = FALSE, recursive = TRUE)
+
+# Run analysis for each race (store results, don't print yet)
+race_results <- list()
+for(race in races) {
+    result <- analyze_by_race(mmf_race_data, race)
+    if(!is.null(result)) {
+        race_results[[race]] <- result
+    }
+}
+
+# Save all plots
+# for(race in names(race_results)) {
+#     filename <- paste0("Results2/Feedback_Analysis/Race_Stratified/MMF_", 
+#                       gsub(" ", "_", race), "_0R_vs_2R.png")
+#     ggsave(filename, race_results[[race]]$plot, width = 10, height = 6, dpi = 300)
+#     cat("Saved:", filename, "\n")
+# }
+
+# ============================================================================
+# COMBINED VISUALIZATION
+# ============================================================================
+
+# Create a combined plot showing all races together
+mmf_race_long <- mmf_race_data %>%
+    filter(!is.na(Race)) %>%
+    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
+                 names_to = "Metabolite",
+                 values_to = "Level") %>%
+    mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
+
+p_combined <- ggplot(mmf_race_long, aes(x = ACR_Group, y = Level, fill = ACR_Group)) +
+    geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+    geom_jitter(width = 0.2, alpha = 0.3, size = 0.8) +
+    facet_grid(Metabolite ~ Race, scales = "free_y") +
+    scale_fill_manual(values = c("0R" = "lightblue", "2R+" = "lightcoral")) +
+    labs(title = "MMF Levels by Race: 0R vs 2R+",
+         x = "ACR Group", y = "Level") +
+    theme_minimal() +
+    theme(legend.position = "bottom",
+          axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p_combined)
+ggsave("Results2/Feedback_Analysis/Race_Stratified/MMF_All_Races_Combined.png", p_combined, 
+       width = 12, height = 8, dpi = 300)
+
+# Display all individual race plots
+for(race in names(race_results)) {
+    cat("Displaying:", race, "\n")
+    print(race_results[[race]]$plot)
+}
+```
+
+# Sex-Stratified Analysis on Mycophenolate Levels 0R vs 2R+
+```{r}
+# Get MMF data and merge with sex
+mmf_sex_data <- patients_with_2R %>%
+    filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R")) %>%
+    left_join(clinical_data %>% select(H, Sex, Age, Race, BMI), by = "H")
+
+cat("Total samples after merge:", nrow(mmf_sex_data), "\n")
+cat("Samples with sex information:", sum(!is.na(mmf_sex_data$Sex)), "\n\n")
+
+# Check sex distribution in merged data
+cat("Sex distribution in merged data:\n")
+print(table(mmf_sex_data$Sex, useNA = "ifany"))
+
+cat("\nSex by ACR group:\n")
+print(table(mmf_sex_data$Sex, mmf_sex_data$ACR_Group, useNA = "ifany"))
+
+
+# Function to analyze MMF levels by sex
+analyze_by_sex <- function(data, sex_group) {
+    cat("\n", rep("=", 70), "\n", sep = "")
+    cat("SEX:", sex_group, "\n")
+    cat(rep("=", 70), "\n", sep = "")
+    
+    # Filter for this sex
+    sex_data <- data %>% filter(Sex == sex_group)
+    
+    n_total <- nrow(sex_data)
+    n_0r <- sum(sex_data$ACR_Group == "0R")
+    n_2r <- sum(sex_data$ACR_Group == "2R+")
+    
+    cat("Total samples:", n_total, "(0R:", n_0r, ", 2R+:", n_2r, ")\n\n")
+    
+    # Check if we have enough samples
+    if(n_0r < 3 | n_2r < 3) {
+        cat("WARNING: Insufficient sample size for analysis (need ≥3 per group)\n")
+        return(NULL)
+    }
+    
+    # Wilcoxon tests for C18
+    cat("--- Mycophenolate C18 ---\n")
+    w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ ACR_Group, 
+                         data = sex_data, exact = FALSE)
+    
+    # Wilcoxon tests for HILIC
+    cat("--- Mycophenolate HILIC ---\n")
+    w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ ACR_Group, 
+                           data = sex_data, exact = FALSE)
+    
+    # Create plot
+    sex_long <- sex_data %>%
+        pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
+                     names_to = "Metabolite",
+                     values_to = "Level") %>%
+        mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
+    
+    p <- ggplot(sex_long, aes(x = ACR_Group, y = Level, fill = ACR_Group)) +
+        geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+        geom_jitter(width = 0.2, alpha = 0.5) +
+        stat_summary(fun = median, geom = "point", color = "red", size = 3, shape = 18) +
+        facet_wrap(~ Metabolite, scales = "free_y") +
+        scale_fill_manual(values = c("0R" = "lightblue", "2R+" = "lightcoral")) +
+        scale_x_discrete(labels = c("0R" = paste0("0R\n(n=", n_0r, ")"),
+                                    "2R+" = paste0("2R+\n(n=", n_2r, ")"))) +
+        labs(title = paste("MMF Levels:", sex_group, "patients (0R vs 2R+)"),
+             subtitle = paste0("C18: p=", round(w_c18$p.value, 3), 
+                              "; HILIC: p=", round(w_hilic$p.value, 3)),
+             x = "ACR Group", y = "Level") +
+        theme_minimal() +
+        theme(legend.position = "none")
+    
+    return(list(
+        plot = p, 
+        sex = sex_group,
+        n_0r = n_0r,
+        n_2r = n_2r,
+        p_c18 = w_c18$p.value,
+        p_hilic = w_hilic$p.value,
+        median_0r_c18 = median(sex_data$`Mycophenolate..C18.`[sex_data$ACR_Group == "0R"], na.rm = TRUE),
+        median_2r_c18 = median(sex_data$`Mycophenolate..C18.`[sex_data$ACR_Group == "2R+"], na.rm = TRUE),
+        median_0r_hilic = median(sex_data$`Mycophenolate..HILIC.`[sex_data$ACR_Group == "0R"], na.rm = TRUE),
+        median_2r_hilic = median(sex_data$`Mycophenolate..HILIC.`[sex_data$ACR_Group == "2R+"], na.rm = TRUE)
+    ))
+}
+
+# Get unique sex groups with sufficient data
+sex_groups <- unique(mmf_sex_data$Sex[!is.na(mmf_sex_data$Sex)])
+cat("Sex groups to analyze:", paste(sex_groups, collapse = ", "), "\n")
+
+# Create output directory
+dir.create("Results2/Feedback_Analysis/Sex_Stratified", showWarnings = FALSE, recursive = TRUE)
+
+# Run analysis for each sex group
+sex_results <- list()
+for(sex_group in sex_groups) {
+    result <- analyze_by_sex(mmf_sex_data, sex_group)
+    if(!is.null(result)) {
+        sex_results[[sex_group]] <- result
+    }
+}
+
+# Save all plots
+# cat("\n=== SAVING PLOTS ===\n")
+# for(sex_group in names(sex_results)) {
+#     filename <- paste0("Results2/Feedback_Analysis/Sex_Stratified/MMF_", 
+#                       gsub(" ", "_", sex_group), "_0R_vs_2R.png")
+#     ggsave(filename, sex_results[[sex_group]]$plot, width = 10, height = 6, dpi = 300)
+#     cat("Saved:", filename, "\n")
+# }
+
+
+# ============================================================================
+# COMBINED VISUALIZATION
+# ============================================================================
+
+cat("\n=== CREATING COMBINED SEX COMPARISON PLOT ===\n\n")
+
+# Create a combined plot showing all sex groups together
+mmf_sex_long <- mmf_sex_data %>%
+    filter(!is.na(Sex)) %>%
+    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
+                 names_to = "Metabolite",
+                 values_to = "Level") %>%
+    mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
+
+p_combined <- ggplot(mmf_sex_long, aes(x = ACR_Group, y = Level, fill = ACR_Group)) +
+    geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+    geom_jitter(width = 0.2, alpha = 0.3, size = 0.8) +
+    facet_grid(Metabolite ~ Sex, scales = "free_y") +
+    scale_fill_manual(values = c("0R" = "lightblue", "2R+" = "lightcoral")) +
+    labs(title = "MMF Levels by Sex: 0R vs 2R+",
+         x = "ACR Group", y = "Level") +
+    theme_minimal() +
+    theme(legend.position = "bottom",
+          axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p_combined)
+# ggsave("Results2/Feedback_Analysis/Sex_Stratified/MMF_All_Sex_Groups_Combined.png", p_combined, 
+#        width = 10, height = 8, dpi = 300)
+
+
+# Display all individual sex plots
+for(sex_group in names(sex_results)) {
+    cat("Displaying:", sex_group, "\n")
+    print(sex_results[[sex_group]]$plot)
+}
+
+# ============================================================================
+# STATISTICAL INTERACTION TEST
+# ============================================================================
+
+cat("\n\n=== TESTING FOR SEX x ACR INTERACTION ===\n\n")
+
+# Test if the effect of ACR differs by sex
+mmf_sex_complete <- mmf_sex_data %>% 
+    filter(!is.na(Sex) & !is.na(ACR_Group))
+
+# Linear model with interaction for C18
+cat("--- Mycophenolate C18 ---\n")
+model_c18 <- lm(`Mycophenolate..C18.` ~ Sex * ACR_Group, data = mmf_sex_complete)
+cat("Interaction effect:\n")
+print(summary(model_c18)$coefficients)
+
+# Linear model with interaction for HILIC
+cat("\n--- Mycophenolate HILIC ---\n")
+model_hilic <- lm(`Mycophenolate..HILIC.` ~ Sex * ACR_Group, data = mmf_sex_complete)
+cat("Interaction effect:\n")
+print(summary(model_hilic)$coefficients)
 ```
