@@ -22,6 +22,46 @@
     total_samples <- nrow(nonlog2_data)
     cat("Total number of samples in dataset:", total_samples, "\n")
   
+  #+ Create table of patients with 0R only
+    patients_with_0R_only <- nonlog2_data %>%
+      group_by_at(vars(all_of("H"))) %>%
+      filter(all(ACR == "0R")) %>%
+      ungroup()
+    
+    # check how many patients with 0R only
+    num_patients_0R_only <- patients_with_0R_only %>%
+      group_by_at(vars(all_of("H"))) %>%
+      summarise(n = n_distinct(!!sym("H"))) %>%
+      ungroup() %>%
+      summarise(total = sum(n))
+    cat("Number of unique patients with 0R only:", num_patients_0R_only$total, "\n")
+    # n=5  
+
+    # check total number of samples in patients_with_0R_only
+    total_samples_with_0R_only <- nrow(patients_with_0R_only)
+    cat("Total number of samples in patients with 0R only:", total_samples_with_0R_only, "\n")
+    # n=25
+  
+  #+ Create table of patients with 0R and/or 1R only
+    patients_with_0R_1R_only <- nonlog2_data %>%
+      group_by_at(vars(all_of("H"))) %>%
+      filter(all(ACR %in% c("0R", "1R"))) %>%
+      ungroup()
+    
+    # check how many patients with 0R/1R only
+    num_patients_0R_1R_only <- patients_with_0R_1R_only %>%
+      group_by_at(vars(all_of("H"))) %>%
+      summarise(n = n_distinct(!!sym("H"))) %>%
+      ungroup() %>%
+      summarise(total = sum(n))
+    cat("Number of unique patients with 0R/1R only:", num_patients_0R_1R_only$total, "\n")
+    # n=39  
+
+    # check total number of samples in patients_with_0R_1R_only
+    total_samples_with_0R_1R_only <- nrow(patients_with_0R_1R_only)
+    cat("Total number of samples in patients with 0R/1R only:", total_samples_with_0R_1R_only, "\n")
+    # n=221
+
   #+ Create table of patients with at least one 2R episode
     patients_with_2R <- nonlog2_data %>%
       mutate(is_2R = grepl("^2R", as.character(!!sym("ACR")), ignore.case = TRUE)) %>%

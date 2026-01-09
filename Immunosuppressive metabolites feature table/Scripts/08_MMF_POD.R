@@ -1,4 +1,5 @@
-# Simplified MMF Analysis with POD Stratification (Feedback Q1 and Q2)
+# MMF Analysis with POD Stratification (Feedback Q1 and Q2)
+#! This is only comparing samples within patients who have at least one 2R episode
 
 # Load data (run 00_source first)
 # source("Immunosuppressive metabolites feature table/Scripts/00_source")
