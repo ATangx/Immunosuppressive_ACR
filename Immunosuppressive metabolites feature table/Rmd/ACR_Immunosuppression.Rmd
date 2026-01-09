@@ -2,7 +2,7 @@
 title: "ACR Immunosuppression Metabolites Analysis"
 output: html_document
 author: "Ailin Tang"
-date: "2025-12-23"
+date: "2025-01-08"
 editor_options: 
   chunk_output_type: console
 ---
@@ -78,9 +78,7 @@ suppressPackageStartupMessages({
       ungroup() %>%
       summarise(total = sum(n))
     cat("Number of unique patients with at least one 2R episode:", num_patients_2R$total, "\n")
-    # n=18  
-
-    # check total number of samples in patients_with_2R
+    
     total_samples_with_2R <- nrow(patients_with_2R)
     cat("Total number of samples in patients with at least one 2R episode:", total_samples_with_2R, "\n")
     # n=133
@@ -279,8 +277,8 @@ dir.create("Results2/Feedback_Analysis/POD_Stratified_new", showWarnings = FALSE
 
 early_results <- analyze_stratum(mmf_data, "Early (≤30 days)")
 print(early_results$plot)
-ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Early.png", early_results$plot, 
-       width = 10, height = 6, dpi = 300)
+# ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MMF_Early.png", early_results$plot, 
+#        width = 10, height = 6, dpi = 300)
 
 late_results <- analyze_stratum(mmf_data, "Late (>30 days)")
 print(late_results$plot)
@@ -486,7 +484,7 @@ print(late_mpa_pod10_45$plot)
 
 
 # Race-Stratified Analysis on Mycophenolate Levels 0R vs 2R+
-```{r}
+```{r, results='hide'}
 # Get MMF data and merge with race
 mmf_race_data <- patients_with_2R %>%
     filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
@@ -519,17 +517,11 @@ analyze_by_race <- function(data, race_group) {
     cat("--- Mycophenolate C18 ---\n")
     w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ ACR_Group, 
                          data = race_data, exact = FALSE)
-    cat("p-value:", round(w_c18$p.value, 4), "\n")
-    cat("Median 0R:", round(median(race_data$`Mycophenolate..C18.`[race_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
-    cat("Median 2R+:", round(median(race_data$`Mycophenolate..C18.`[race_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
     
     # Wilcoxon tests for HILIC
     cat("--- Mycophenolate HILIC ---\n")
     w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ ACR_Group, 
                            data = race_data, exact = FALSE)
-    cat("p-value:", round(w_hilic$p.value, 4), "\n")
-    cat("Median 0R:", round(median(race_data$`Mycophenolate..HILIC.`[race_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
-    cat("Median 2R+:", round(median(race_data$`Mycophenolate..HILIC.`[race_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
     
     # Create plot
     race_long <- race_data %>%
@@ -586,10 +578,11 @@ for(race in races) {
 #     ggsave(filename, race_results[[race]]$plot, width = 10, height = 6, dpi = 300)
 #     cat("Saved:", filename, "\n")
 # }
+```
 
-# ============================================================================
-# COMBINED VISUALIZATION
-# ============================================================================
+
+## Combined Race Stratification Plots
+```{r}
 
 # Create a combined plot showing all races together
 mmf_race_long <- mmf_race_data %>%
@@ -611,8 +604,8 @@ p_combined <- ggplot(mmf_race_long, aes(x = ACR_Group, y = Level, fill = ACR_Gro
           axis.text.x = element_text(angle = 45, hjust = 1))
 
 print(p_combined)
-ggsave("Results2/Feedback_Analysis/Race_Stratified/MMF_All_Races_Combined.png", p_combined, 
-       width = 12, height = 8, dpi = 300)
+# ggsave("Results2/Feedback_Analysis/Race_Stratified/MMF_All_Races_Combined.png", p_combined, 
+#        width = 12, height = 8, dpi = 300)
 
 # Display all individual race plots
 for(race in names(race_results)) {
@@ -629,17 +622,6 @@ mmf_sex_data <- patients_with_2R %>%
     select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R")) %>%
     left_join(clinical_data %>% select(H, Sex, Age, Race, BMI), by = "H")
-
-cat("Total samples after merge:", nrow(mmf_sex_data), "\n")
-cat("Samples with sex information:", sum(!is.na(mmf_sex_data$Sex)), "\n\n")
-
-# Check sex distribution in merged data
-cat("Sex distribution in merged data:\n")
-print(table(mmf_sex_data$Sex, useNA = "ifany"))
-
-cat("\nSex by ACR group:\n")
-print(table(mmf_sex_data$Sex, mmf_sex_data$ACR_Group, useNA = "ifany"))
-
 
 # Function to analyze MMF levels by sex
 analyze_by_sex <- function(data, sex_group) {
@@ -710,7 +692,6 @@ analyze_by_sex <- function(data, sex_group) {
 
 # Get unique sex groups with sufficient data
 sex_groups <- unique(mmf_sex_data$Sex[!is.na(mmf_sex_data$Sex)])
-cat("Sex groups to analyze:", paste(sex_groups, collapse = ", "), "\n")
 
 # Create output directory
 dir.create("Results2/Feedback_Analysis/Sex_Stratified", showWarnings = FALSE, recursive = TRUE)
@@ -732,13 +713,10 @@ for(sex_group in sex_groups) {
 #     ggsave(filename, sex_results[[sex_group]]$plot, width = 10, height = 6, dpi = 300)
 #     cat("Saved:", filename, "\n")
 # }
+```
 
-
-# ============================================================================
-# COMBINED VISUALIZATION
-# ============================================================================
-
-cat("\n=== CREATING COMBINED SEX COMPARISON PLOT ===\n\n")
+## Combined Plots
+```{r}
 
 # Create a combined plot showing all sex groups together
 mmf_sex_long <- mmf_sex_data %>%
@@ -769,13 +747,10 @@ for(sex_group in names(sex_results)) {
     cat("Displaying:", sex_group, "\n")
     print(sex_results[[sex_group]]$plot)
 }
+```
 
-# ============================================================================
-# STATISTICAL INTERACTION TEST
-# ============================================================================
-
-cat("\n\n=== TESTING FOR SEX x ACR INTERACTION ===\n\n")
-
+## Statistical Interaction Test
+```{r}
 # Test if the effect of ACR differs by sex
 mmf_sex_complete <- mmf_sex_data %>% 
     filter(!is.na(Sex) & !is.na(ACR_Group))
