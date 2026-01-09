@@ -1,11 +1,22 @@
-# MMF Analysis with POD Stratification - 0R/1R-only Patients vs 2R Patients
-# Comparing ALL samples from patients who have ONLY 0R/1R vs ALL samples from patients who develop 2R
-# This is a patient-level phenotype comparison (similar to 08b, but using 0R/1R-only instead of 0R-only)
+# MMF Analysis with POD Stratification - 0R-only Patients vs 2R+ Samples
+# Comparing samples from patients who have ONLY 0R (strictest non-rejectors) vs 2R+ samples
+        #! Question answered: "Do patients who never reject have different MMF levels overall compared to patients who are prone to rejection?"
+
+        # Interpretation:
+
+        # Tests whether there's an inherent difference between patient populations
+        # Not about the rejection event itself, but about the patient phenotype
+        # More balanced comparison (both groups include various timepoints)
+        
+        # Advantage:
+
+        # Cleaner patient-level comparison
+        # Tests for baseline/trait differences rather than state differences
 
 # Load data (run 00_source first)
 # source("Immunosuppressive metabolites feature table/Scripts/00_source")
 
-# NOTE: patients_with_0R_1R_only and patients_with_2R are already created in 02_setup
+# NOTE: patients_with_0R_only and patients_with_2R are already created in 02_setup
 
 # ============================================================================
 # VERIFY PATIENT GROUPS
@@ -13,25 +24,25 @@
 
 cat("\n=== PATIENT GROUPS (from 02_setup) ===\n\n")
 
-cat("Patients with ONLY 0R/1R (non-severe rejectors):", 
-    length(unique(patients_with_0R_1R_only$H)), "patients,", 
-    nrow(patients_with_0R_1R_only), "samples\n")
+cat("Patients with ONLY 0R (strictest non-rejectors):", 
+    length(unique(patients_with_0R_only$H)), "patients,", 
+    nrow(patients_with_0R_only), "samples\n")
 cat("Patients who develop 2R at any point:", 
     length(unique(patients_with_2R$H)), "patients,", 
     nrow(patients_with_2R), "samples\n\n")
 
 # ============================================================================
-# PART 1: Overall MMF comparison (0R/1R-only patients vs 2R patients - ALL samples)
+# PART 1: Overall MMF comparison (0R-only patients vs 2R patients - ALL samples)
 # ============================================================================
 
-cat("\n=== OVERALL MMF ANALYSIS (0R/1R-only patients vs 2R patients) ===\n")
-cat("Comparing: All samples from 0R/1R-only patients vs ALL samples from patients who develop 2R\n")
+cat("\n=== OVERALL MMF ANALYSIS (0R-only patients vs 2R patients) ===\n")
+cat("Comparing: All samples from 0R-only patients vs ALL samples from patients who develop 2R\n")
 cat("NOTE: This tests inherent patient-level differences, not just rejection state\n\n")
 
-# Get all samples from 0R/1R-only patients
-mmf_0r1r_only <- patients_with_0R_1R_only %>%
+# Get data from 0R-only patients (all their samples)
+mmf_0r_only <- patients_with_0R_only %>%
     select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
-    mutate(Patient_Group = "0R/1R-only patients")
+    mutate(Patient_Group = "0R-only patients")
 
 # Get ALL samples from patients who develop 2R (including their 0R, 1R, 2R+ samples)
 mmf_2r_patients <- patients_with_2R %>%
@@ -39,13 +50,11 @@ mmf_2r_patients <- patients_with_2R %>%
     mutate(Patient_Group = "2R patients (all samples)")
 
 # Combine for comparison
-mmf_data <- bind_rows(mmf_0r1r_only, mmf_2r_patients)
+mmf_data <- bind_rows(mmf_0r_only, mmf_2r_patients)
 
 cat("Total samples in comparison:\n")
-cat("  0R/1R-only patients:", nrow(mmf_0r1r_only), "samples from", 
-    length(unique(mmf_0r1r_only$H)), "patients\n")
-cat("    - 0R samples:", sum(mmf_0r1r_only$ACR == "0R"), "\n")
-cat("    - 1R samples:", sum(mmf_0r1r_only$ACR == "1R"), "\n")
+cat("  0R-only patients:", nrow(mmf_0r_only), "samples from", 
+    length(unique(mmf_0r_only$H)), "patients (all 0R)\n")
 cat("  2R patients:", nrow(mmf_2r_patients), "samples from", 
     length(unique(mmf_2r_patients$H)), "patients (includes 0R, 1R, 2R+ samples)\n")
 cat("    - 0R samples:", sum(mmf_2r_patients$ACR == "0R"), "\n")
@@ -77,7 +86,7 @@ mmf_long <- mmf_data %>%
     mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
 
 # Get sample sizes for x-axis labels
-n_0r1r_only <- nrow(mmf_0r1r_only)
+n_0r <- nrow(mmf_0r_only)
 n_2r <- nrow(mmf_2r_patients)
 
 p_overall <- ggplot(mmf_long, aes(x = Patient_Group, y = Level, fill = Patient_Group)) +
@@ -85,10 +94,10 @@ p_overall <- ggplot(mmf_long, aes(x = Patient_Group, y = Level, fill = Patient_G
     geom_jitter(width = 0.2, alpha = 0.5) +
     stat_summary(fun = median, geom = "point", color = "red", size = 3, shape = 18) +
     facet_wrap(~ Metabolite, scales = "free_y") +
-    scale_fill_manual(values = c("0R/1R-only patients" = "lightgreen", "2R patients (all samples)" = "lightcoral")) +
-    scale_x_discrete(labels = c("0R/1R-only patients" = paste0("0R/1R-only\n(n=", n_0r1r_only, ")"),
+    scale_fill_manual(values = c("0R-only patients" = "lightblue", "2R patients (all samples)" = "lightcoral")) +
+    scale_x_discrete(labels = c("0R-only patients" = paste0("0R-only\n(n=", n_0r, ")"),
                                 "2R patients (all samples)" = paste0("2R patients\n(n=", n_2r, ")"))) +
-    labs(title = "MMF Levels: 0R/1R-only Patients vs 2R Patients (All Samples)",
+    labs(title = "MMF Levels: 0R-only Patients vs 2R Patients (All Samples)",
          subtitle = paste0("Patient-level comparison | C18: p=", round(wilcox_c18$p.value, 3), 
                           "; HILIC: p=", round(wilcox_hilic$p.value, 3)),
          x = "Patient Group", y = "Level") +
@@ -98,8 +107,8 @@ p_overall <- ggplot(mmf_long, aes(x = Patient_Group, y = Level, fill = Patient_G
 print(p_overall)
 
 # Create output directory
-dir.create("Results2/Feedback_Analysis/0R1R_only_vs_2R", showWarnings = FALSE, recursive = TRUE)
-ggsave("Results2/Feedback_Analysis/0R1R_only_vs_2R/MMF_Overall.png", p_overall, 
+dir.create("Results2/Feedback_Analysis/0R_only_vs_2R", showWarnings = FALSE, recursive = TRUE)
+ggsave("Results2/Feedback_Analysis/0R_only_vs_2R/MMF_Overall.png", p_overall, 
        width = 10, height = 6, dpi = 300)
 
 # ============================================================================
@@ -117,11 +126,11 @@ analyze_stratum <- function(data, stratum) {
     cat("--- ", stratum, " ---\n")
     
     stratum_data <- data %>% filter(POD_Stratum == stratum)
-    n_0r1r <- sum(stratum_data$Patient_Group == "0R/1R-only patients")
+    n_0r <- sum(stratum_data$Patient_Group == "0R-only patients")
     n_2r <- sum(stratum_data$Patient_Group == "2R patients (all samples)")
     
     cat("Sample size:", nrow(stratum_data), 
-        "(0R/1R-only:", n_0r1r, ", 2R patients:", n_2r, ")\n\n")
+        "(0R-only:", n_0r, ", 2R patients:", n_2r, ")\n\n")
     
     # Wilcoxon tests
     w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ Patient_Group, 
@@ -143,10 +152,10 @@ analyze_stratum <- function(data, stratum) {
         geom_jitter(width = 0.2, alpha = 0.5) +
         stat_summary(fun = median, geom = "point", color = "red", size = 3, shape = 18) +
         facet_wrap(~ Metabolite, scales = "free_y") +
-        scale_fill_manual(values = c("0R/1R-only patients" = "lightgreen", "2R patients (all samples)" = "lightcoral")) +
-        scale_x_discrete(labels = c("0R/1R-only patients" = paste0("0R/1R-only\n(n=", n_0r1r, ")"),
+        scale_fill_manual(values = c("0R-only patients" = "lightblue", "2R patients (all samples)" = "lightcoral")) +
+        scale_x_discrete(labels = c("0R-only patients" = paste0("0R-only\n(n=", n_0r, ")"),
                                     "2R patients (all samples)" = paste0("2R patients\n(n=", n_2r, ")"))) +
-        labs(title = paste("MMF Levels:", stratum, "(0R/1R-only vs 2R patients)"),
+        labs(title = paste("MMF Levels:", stratum, "(0R-only vs 2R patients)"),
              subtitle = paste0("C18: p=", round(w_c18$p.value, 3), 
                               "; HILIC: p=", round(w_hilic$p.value, 3)),
              x = "Patient Group", y = "Level") +
@@ -159,12 +168,12 @@ analyze_stratum <- function(data, stratum) {
 # Run for each stratum
 early_results <- analyze_stratum(mmf_data, "Early (≤30 days)")
 print(early_results$plot)
-ggsave("Results2/Feedback_Analysis/0R1R_only_vs_2R/MMF_Early.png", early_results$plot, 
+ggsave("Results2/Feedback_Analysis/0R_only_vs_2R/MMF_Early.png", early_results$plot, 
        width = 10, height = 6, dpi = 300)
 
 late_results <- analyze_stratum(mmf_data, "Late (>30 days)")
 print(late_results$plot)
-ggsave("Results2/Feedback_Analysis/0R1R_only_vs_2R/MMF_Late.png", late_results$plot, 
+ggsave("Results2/Feedback_Analysis/0R_only_vs_2R/MMF_Late.png", late_results$plot, 
        width = 10, height = 6, dpi = 300)
 
 # ============================================================================
@@ -175,20 +184,20 @@ cat("\n\n=== POD-STRATIFIED MMF ANALYSIS (EXCLUDING POD<10) ===\n")
 cat("NOTE: Removing very early post-transplant samples (POD<10)\n\n")
 
 # Filter out POD<10 samples
-mmf_0r1r_pod10plus <- patients_with_0R_1R_only %>%
+mmf_0r_pod10plus <- patients_with_0R_only %>%
     filter(POD >= 10) %>%
     select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
-    mutate(Patient_Group = "0R/1R-only patients")
+    mutate(Patient_Group = "0R-only patients")
 
 mmf_2r_pod10plus <- patients_with_2R %>%
     filter(POD >= 10) %>%
     select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(Patient_Group = "2R patients (all samples)")
 
-mmf_data_pod10plus <- bind_rows(mmf_0r1r_pod10plus, mmf_2r_pod10plus)
+mmf_data_pod10plus <- bind_rows(mmf_0r_pod10plus, mmf_2r_pod10plus)
 
 cat("Total samples with POD >= 10:", nrow(mmf_data_pod10plus), "\n")
-cat("0R/1R-only patients:", nrow(mmf_0r1r_pod10plus), "\n")
+cat("0R-only patients:", nrow(mmf_0r_pod10plus), "\n")
 cat("2R patients (all samples):", nrow(mmf_2r_pod10plus), "\n\n")
 
 # Add POD stratum
@@ -198,12 +207,12 @@ mmf_data_pod10plus <- mmf_data_pod10plus %>%
 # Run for each stratum
 early_results_pod10 <- analyze_stratum(mmf_data_pod10plus, "Early (10-30 days)")
 print(early_results_pod10$plot)
-ggsave("Results2/Feedback_Analysis/0R1R_only_vs_2R/MMF_Early_POD10plus.png", early_results_pod10$plot, 
+ggsave("Results2/Feedback_Analysis/0R_only_vs_2R/MMF_Early_POD10plus.png", early_results_pod10$plot, 
        width = 10, height = 6, dpi = 300)
 
 late_results_pod10 <- analyze_stratum(mmf_data_pod10plus, "Late (>30 days)")
 print(late_results_pod10$plot)
-ggsave("Results2/Feedback_Analysis/0R1R_only_vs_2R/MMF_Late_POD10plus.png", late_results_pod10$plot, 
+ggsave("Results2/Feedback_Analysis/0R_only_vs_2R/MMF_Late_POD10plus.png", late_results_pod10$plot, 
        width = 10, height = 6, dpi = 300)
 
 # ============================================================================
@@ -215,20 +224,20 @@ cat("NOTE: Removing very early (POD<10) and late (POD>45) samples\n")
 cat("      to focus on the acute post-transplant window\n\n")
 
 # Filter to POD 10-45 only
-mmf_0r1r_pod10_45 <- patients_with_0R_1R_only %>%
+mmf_0r_pod10_45 <- patients_with_0R_only %>%
     filter(POD >= 10 & POD <= 45) %>%
     select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
-    mutate(Patient_Group = "0R/1R-only patients")
+    mutate(Patient_Group = "0R-only patients")
 
 mmf_2r_pod10_45 <- patients_with_2R %>%
     filter(POD >= 10 & POD <= 45) %>%
     select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(Patient_Group = "2R patients (all samples)")
 
-mmf_data_pod10_45 <- bind_rows(mmf_0r1r_pod10_45, mmf_2r_pod10_45)
+mmf_data_pod10_45 <- bind_rows(mmf_0r_pod10_45, mmf_2r_pod10_45)
 
 cat("Total samples with POD 10-45:", nrow(mmf_data_pod10_45), "\n")
-cat("0R/1R-only patients:", nrow(mmf_0r1r_pod10_45), "\n")
+cat("0R-only patients:", nrow(mmf_0r_pod10_45), "\n")
 cat("2R patients (all samples):", nrow(mmf_2r_pod10_45), "\n\n")
 
 # Add POD stratum
@@ -238,19 +247,19 @@ mmf_data_pod10_45 <- mmf_data_pod10_45 %>%
 # Run for each stratum
 early_results_pod10_45 <- analyze_stratum(mmf_data_pod10_45, "Early (10-30 days)")
 print(early_results_pod10_45$plot)
-ggsave("Results2/Feedback_Analysis/0R1R_only_vs_2R/MMF_Early_POD10_45.png", early_results_pod10_45$plot, 
+ggsave("Results2/Feedback_Analysis/0R_only_vs_2R/MMF_Early_POD10_45.png", early_results_pod10_45$plot, 
        width = 10, height = 6, dpi = 300)
 
 late_results_pod10_45 <- analyze_stratum(mmf_data_pod10_45, "Late (31-45 days)")
 print(late_results_pod10_45$plot)
-ggsave("Results2/Feedback_Analysis/0R1R_only_vs_2R/MMF_Late_POD10_45.png", late_results_pod10_45$plot, 
+ggsave("Results2/Feedback_Analysis/0R_only_vs_2R/MMF_Late_POD10_45.png", late_results_pod10_45$plot, 
        width = 10, height = 6, dpi = 300)
 
 # ============================================================================
 # SUMMARY
 # ============================================================================
 
-cat("\n=== SUMMARY (0R/1R-ONLY vs 2R PATIENTS COMPARISON) ===\n")
+cat("\n=== SUMMARY (0R-ONLY vs 2R+ COMPARISON) ===\n")
 cat("Overall:      C18 p=", round(wilcox_c18$p.value, 3), 
     ", HILIC p=", round(wilcox_hilic$p.value, 3), "\n")
 cat("Early ≤30d:   C18 p=", round(early_results$p_c18, 3), 
@@ -261,41 +270,19 @@ cat("Early 10-30d: C18 p=", round(early_results_pod10$p_c18, 3),
     ", HILIC p=", round(early_results_pod10$p_hilic, 3), "\n")
 cat("Late >30d:    C18 p=", round(late_results_pod10$p_c18, 3), 
     ", HILIC p=", round(late_results_pod10$p_hilic, 3), "\n")
-cat("Early 10-30d: C18 p=", round(early_results_pod10_45$p_c18, 3), 
-    ", HILIC p=", round(early_results_pod10_45$p_hilic, 3), " (POD 10-45 only)\n")
+cat("Early 10-45d: C18 p=", round(early_results_pod10_45$p_c18, 3), 
+    ", HILIC p=", round(early_results_pod10_45$p_hilic, 3), "\n")
 cat("Late 31-45d:  C18 p=", round(late_results_pod10_45$p_c18, 3), 
-    ", HILIC p=", round(late_results_pod10_45$p_hilic, 3), " (POD 10-45 only)\n")
-cat("\nPlots saved to: Results2/Feedback_Analysis/0R1R_only_vs_2R/\n\n")
+    ", HILIC p=", round(late_results_pod10_45$p_hilic, 3), "\n")
+cat("\nPlots saved to: Results2/Feedback_Analysis/0R_only_vs_2R/\n\n")
 
 cat("\n=== INTERPRETATION ===\n")
 cat("This analysis compares PATIENT-LEVEL differences:\n")
-cat("  - 0R/1R-only patients: Never develop severe (2R+) rejection (n=", 
-    length(unique(mmf_0r1r_only$H)), " patients, all samples)\n", sep = "")
-cat("  - 2R patients: Develop 2R at some point (n=", 
-    length(unique(mmf_2r_patients$H)), " patients, ALL samples including 0R/1R/2R+)\n\n", sep = "")
-
-cat("Key Insights:\n")
-cat("  - Tests inherent patient phenotype differences (similar to 08b)\n")
-cat("  - Broader patient group than 08b (includes 1R patients)\n")
-cat("  - More statistical power than 0R-only comparisons\n")
-cat("  - Mixes rejection states within the 2R patient group\n\n")
-
-cat("Comparison with other analyses:\n")
+cat("  - 0R-only patients: Never have ANY rejection (strictest non-rejectors, n=5)\n")
+cat("  - 2R patients: ALL samples from patients who develop 2R (includes 0R/1R/2R+ samples, n=18)\n")
+cat("\nComparison with other analyses:\n")
 cat("  08_MMF_POD.R:  Within-patient (0R vs 2R+ samples in patients who reject)\n")
-cat("                 → Tests rejection STATE effects\n\n")
-cat("  08a_MMF_POD.R: 0R/1R-only patients vs 2R patients (all samples) [THIS SCRIPT]\n")
-cat("                 → Patient phenotype with broader inclusion (0R/1R-only)\n\n")
-cat("  08b_MMF_POD.R: 0R-only patients vs 2R patients (all samples)\n")
-cat("                 → Patient phenotype with strictest non-rejectors (0R-only)\n\n")
-cat("  08c_MMF_POD.R: Patient phenotype controlled for rejection state\n")
-cat("                 → 0R vs 0R; 0R/1R vs 0R/1R (cleanest patient comparison)\n\n")
-
-cat("Clinical Implications:\n")
-cat("  - If significant: Patients prone to severe rejection differ from non-severe rejectors\n")
-cat("  - Compare with 08b: Does including 1R patients change the conclusions?\n")
-cat("  - Compare with 08c: Are differences driven by rejection state or patient phenotype?\n\n")
-
-
-
-
-
+cat("  08a_MMF_POD.R: Between-patient (0R/1R-only patients vs 2R+ samples)\n")
+cat("  08b_MMF_POD.R: Patient phenotype (0R-only patients vs 2R patients, all samples)\n\n")
+cat("This tests: Do patients who never reject have inherently different MMF levels\n")
+cat("compared to patients who are prone to rejection (regardless of rejection state)?\n\n")
