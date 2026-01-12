@@ -1,0 +1,4 @@
+GFR_Category,GFR_Range,N_0R,N_2R_plus,Median_0R,Median_2R,P_value
+Normal (≥90),94 - 140,5,3,1036345,1129274,1
+Mild Reduction (60-89),60 - 89,15,11,1313914,1120149,0.2644
+Moderate Reduction (30-59),32 - 55,23,8,1173994,1240221,0.9101

@@ -1,13 +1,13 @@
-# MMF Analysis Scripts Guide
+# MPA Analysis Scripts Guide
 
 ## Overview
-This guide explains the differences between the MMF analysis scripts (08, 08a, 08b, 08c) and when to use each one.
+This guide explains the differences between the MPA analysis scripts (08, 08a, 08b, 08c) and when to use each one.
 
 ---
 
 ## Script Summaries
 
-### **08_MMF_POD.R** - Within-Patient Comparison
+### **08_MPA_POD.R** - Within-Patient Comparison
 **Comparison:** 0R samples vs 2R+ samples **within the same patients**
 
 **Patient Group:** Only patients who develop 2R at some point
@@ -18,13 +18,13 @@ This guide explains the differences between the MMF analysis scripts (08, 08a, 0
 
 **Purpose:** Tests **rejection STATE effects** (what happens when rejection occurs)
 
-**Key Question:** "Within patients who reject, how do MMF levels change from quiescence (0R) to rejection (2R+)?"
+**Key Question:** "Within patients who reject, how do MPA levels change from quiescence (0R) to rejection (2R+)?"
 
 **Output Directory:** `Results2/Feedback_Analysis/Within_Patient_POD_Stratified/`
 
 ---
 
-### **08a_MMF_POD.R** - Patient Phenotype (Broader Inclusion)
+### **08a_MPA_POD.R** - Patient Phenotype (Broader Inclusion)
 **Comparison:** ALL samples from 0R/1R-only patients vs ALL samples from 2R patients
 
 **Patient Groups:**
@@ -43,9 +43,22 @@ This guide explains the differences between the MMF analysis scripts (08, 08a, 0
 
 **Note:** Similar to 08b but includes 1R patients in the "non-severe" group
 
+**Note**
+- Crude Overall Summary - 
+
+Rejection state confounding: The 2R patient group includes:
+
+0R samples (quiescent)
+1R samples (mild rejection)
+2R+ samples (severe rejection)
+So you're mixing different biological states in one group
+
+Time confounding: If 2R patients tend to have samples at different POD than 0R/1R-only patients, that could drive differences
+
+Treatment confounding: Patients who develop 2R might get different treatments/dose adjustments
 ---
 
-### **08b_MMF_POD.R** - Patient Phenotype (Strictest Inclusion)
+### **08b_MPA_POD.R** - Patient Phenotype (Strictest Inclusion)
 **Comparison:** ALL samples from 0R-only patients vs ALL samples from 2R patients
 
 **Patient Groups:**
@@ -66,7 +79,7 @@ This guide explains the differences between the MMF analysis scripts (08, 08a, 0
 
 ---
 
-### **08c_MMF_patient_phenotype.R** - Patient Phenotype (State-Controlled)
+### **08c_MPA_patient_phenotype.R** - Patient Phenotype (State-Controlled)
 **Comparison 1:** 0R samples from 0R-only patients vs 0R samples from 2R patients
 
 **Comparison 2:** 0R/1R samples from 0R/1R-only patients vs 0R/1R samples from 2R patients
@@ -106,12 +119,12 @@ This guide explains the differences between the MMF analysis scripts (08, 08a, 0
 ## Clinical Interpretation
 
 ### Within-Patient (08)
-- **Significant result:** MMF levels change during rejection episodes
+- **Significant result:** MPA levels change during rejection episodes
 - **Clinical use:** Understand drug behavior during acute rejection
 - **Limitation:** Only includes patients who reject
 
 ### Between-Patient, All Samples (08a, 08b)
-- **Significant result:** Rejection-prone patients have inherently different MMF levels
+- **Significant result:** Rejection-prone patients have inherently different MPA levels
 - **Clinical use:** Identify patients at risk based on baseline drug levels
 - **Limitation:** Mixes rejection states (confounds phenotype with state)
 - **08a vs 08b:** 08a has more power (larger n), 08b has stricter definition
@@ -143,7 +156,7 @@ This guide explains the differences between the MMF analysis scripts (08, 08a, 0
 
 **If all are significant:**
 - Strong evidence for inherent patient-level differences
-- MMF levels consistently lower/higher in rejection-prone patients
+- MPA levels consistently lower/higher in rejection-prone patients
 
 **If only 08 is significant:**
 - Rejection is a STATE phenomenon, not a PHENOTYPE
@@ -206,4 +219,4 @@ Compare results across scripts to understand:
 1. Is rejection a STATE or PHENOTYPE phenomenon?
 2. Does including 1R patients change conclusions (08a vs 08b)?
 3. Are differences driven by rejection state or patient baseline (08a/08b vs 08c)?
-4. Do MMF levels change during rejection episodes (08)?
+4. Do MPA levels change during rejection episodes (08)?

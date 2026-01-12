@@ -1,4 +1,4 @@
-# MMF Analysis: Patient Phenotype Comparison (Rejection State Controlled)
+# MPA Analysis: Patient Phenotype Comparison (Rejection State Controlled)
 # Comparing 0R samples from 0R-only patients vs 0R samples from 2R patients
 # This isolates PATIENT-LEVEL differences while controlling for rejection state
 
@@ -25,7 +25,7 @@ cat("  - 0R samples from 2R patients:",
     sum(patients_with_2R$ACR == "0R"), "samples\n\n")
 
 # ============================================================================
-# PART 1: Overall 0R Sample Comparison
+#- PART 1: Overall 0R Sample Comparison
 # ============================================================================
 
 cat("\n=== OVERALL 0R SAMPLE COMPARISON ===\n")
@@ -33,63 +33,63 @@ cat("Comparing: 0R samples from 0R-only patients vs 0R samples from 2R patients\
 cat("NOTE: Same rejection state (0R), different patient phenotypes\n\n")
 
 # Get 0R samples from 0R-only patients (all their samples are 0R)
-mmf_0r_only <- patients_with_0R_only %>%
-    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+mpa_0r_only <- patients_with_0R_only %>%
+    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
     mutate(Patient_Phenotype = "0R-only patients")
 
 # Get ONLY 0R samples from patients who develop 2R
-mmf_0r_from_2r <- patients_with_2R %>%
+mpa_0r_from_2r <- patients_with_2R %>%
     filter(ACR == "0R") %>%
-    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
     mutate(Patient_Phenotype = "2R patients (0R samples)")
 
 # Combine for comparison
-mmf_data <- bind_rows(mmf_0r_only, mmf_0r_from_2r)
+mpa_data <- bind_rows(mpa_0r_only, mpa_0r_from_2r)
 
 cat("Sample sizes:\n")
-cat("  0R samples from 0R-only patients:", nrow(mmf_0r_only), "samples from", 
-    length(unique(mmf_0r_only$H)), "patients\n")
-cat("  0R samples from 2R patients:", nrow(mmf_0r_from_2r), "samples from", 
-    length(unique(mmf_0r_from_2r$H)), "patients\n\n")
+cat("  0R samples from 0R-only patients:", nrow(mpa_0r_only), "samples from", 
+    length(unique(mpa_0r_only$H)), "patients\n")
+cat("  0R samples from 2R patients:", nrow(mpa_0r_from_2r), "samples from", 
+    length(unique(mpa_0r_from_2r$H)), "patients\n\n")
 
 # Run Wilcoxon tests
-cat("Mycophenolate C18:\n")
+cat("MPA (C18):\n")
 wilcox_c18 <- wilcox.test(
-    `Mycophenolate..C18.` ~ Patient_Phenotype, 
-    data = mmf_data, 
+    `MPA..C18.` ~ Patient_Phenotype, 
+    data = mpa_data, 
     exact = FALSE
 )
 print(wilcox_c18)
 
-cat("\nMycophenolate HILIC:\n")
+cat("\nMPA (HILIC):\n")
 wilcox_hilic <- wilcox.test(
-    `Mycophenolate..HILIC.` ~ Patient_Phenotype, 
-    data = mmf_data, 
+    `MPA..HILIC.` ~ Patient_Phenotype, 
+    data = mpa_data, 
     exact = FALSE
 )
 print(wilcox_hilic)
 
 # Get medians for interpretation
-medians_c18 <- mmf_data %>%
+medians_c18 <- mpa_data %>%
     group_by(Patient_Phenotype) %>%
     summarise(
-        median_C18 = median(`Mycophenolate..C18.`, na.rm = TRUE),
-        median_HILIC = median(`Mycophenolate..HILIC.`, na.rm = TRUE)
+        median_C18 = median(`MPA..C18.`, na.rm = TRUE),
+        median_HILIC = median(`MPA..HILIC.`, na.rm = TRUE)
     )
 print(medians_c18)
 
 # Plot overall comparison
-mmf_long <- mmf_data %>%
-    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
+mpa_long <- mpa_data %>%
+    pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
                  names_to = "Metabolite",
                  values_to = "Level") %>%
     mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
 
 # Get sample sizes for x-axis labels
-n_0r_only <- nrow(mmf_0r_only)
-n_0r_from_2r <- nrow(mmf_0r_from_2r)
+n_0r_only <- nrow(mpa_0r_only)
+n_0r_from_2r <- nrow(mpa_0r_from_2r)
 
-p_overall <- ggplot(mmf_long, aes(x = Patient_Phenotype, y = Level, fill = Patient_Phenotype)) +
+p_overall <- ggplot(mpa_long, aes(x = Patient_Phenotype, y = Level, fill = Patient_Phenotype)) +
     geom_boxplot(alpha = 0.7, outlier.shape = NA) +
     geom_jitter(width = 0.2, alpha = 0.5) +
     stat_summary(fun = median, geom = "point", color = "red", size = 3, shape = 18) +
@@ -98,7 +98,7 @@ p_overall <- ggplot(mmf_long, aes(x = Patient_Phenotype, y = Level, fill = Patie
                                   "2R patients (0R samples)" = "lightcoral")) +
     scale_x_discrete(labels = c("0R-only patients" = paste0("0R-only\npatients\n(n=", n_0r_only, ")"),
                                 "2R patients (0R samples)" = paste0("2R patients\n(0R samples)\n(n=", n_0r_from_2r, ")"))) +
-    labs(title = "MMF Levels in 0R Samples: Patient Phenotype Comparison",
+    labs(title = "MPA Levels in 0R Samples: Patient Phenotype Comparison",
          subtitle = paste0("0R-only patients vs 0R samples from 2R patients | C18: p=", 
                           round(wilcox_c18$p.value, 3), "; HILIC: p=", round(wilcox_hilic$p.value, 3)),
          x = "Patient Phenotype", y = "Level") +
@@ -120,7 +120,7 @@ ggsave("Results2/Feedback_Analysis/Patient_Phenotype/MMF_0R_Samples_Overall.png"
 cat("\n\n=== POD-STRATIFIED 0R SAMPLE COMPARISON ===\n\n")
 
 # Add POD stratum
-mmf_data <- mmf_data %>%
+mpa_data <- mpa_data %>%
     mutate(POD_Stratum = ifelse(POD <= 30, "Early (≤30 days)", "Late (>30 days)"))
 
 # Function to run tests for one stratum
@@ -141,9 +141,9 @@ analyze_stratum <- function(data, stratum) {
     }
     
     # Wilcoxon tests
-    w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ Patient_Phenotype, 
+    w_c18 <- wilcox.test(`MPA..C18.` ~ Patient_Phenotype, 
                          data = stratum_data, exact = FALSE)
-    w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ Patient_Phenotype, 
+    w_hilic <- wilcox.test(`MPA..HILIC.` ~ Patient_Phenotype, 
                            data = stratum_data, exact = FALSE)
     
     cat("C18:   p =", round(w_c18$p.value, 3), "\n")
@@ -153,15 +153,15 @@ analyze_stratum <- function(data, stratum) {
     meds <- stratum_data %>%
         group_by(Patient_Phenotype) %>%
         summarise(
-            median_C18 = median(`Mycophenolate..C18.`, na.rm = TRUE),
-            median_HILIC = median(`Mycophenolate..HILIC.`, na.rm = TRUE)
+            median_C18 = median(`MPA..C18.`, na.rm = TRUE),
+            median_HILIC = median(`MPA..HILIC.`, na.rm = TRUE)
         )
     print(meds)
     cat("\n")
     
     # Create plot with sample sizes in x-axis labels
     stratum_long <- stratum_data %>%
-        pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
+        pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
                      names_to = "Metabolite", values_to = "Level") %>%
         mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
     
@@ -174,8 +174,8 @@ analyze_stratum <- function(data, stratum) {
                                       "2R patients (0R samples)" = "lightcoral")) +
         scale_x_discrete(labels = c("0R-only patients" = paste0("0R-only\npatients\n(n=", n_0r_only, ")"),
                                     "2R patients (0R samples)" = paste0("2R patients\n(0R samples)\n(n=", n_0r_from_2r, ")"))) +
-        labs(title = paste("MMF Levels in 0R Samples:", stratum),
-             subtitle = paste0("Patient phenotype comparison | C18: p=", round(w_c18$p.value, 3), 
+        labs(title = paste("MPA Levels in 0R Samples:", stratum),
+             subtitle = paste0("Baseline state comparison | C18: p=", round(w_c18$p.value, 3), 
                               "; HILIC: p=", round(w_hilic$p.value, 3)),
              x = "Patient Phenotype", y = "Level") +
         theme_minimal() +
@@ -186,14 +186,14 @@ analyze_stratum <- function(data, stratum) {
 }
 
 # Run for each stratum
-early_results <- analyze_stratum(mmf_data, "Early (≤30 days)")
+early_results <- analyze_stratum(mpa_data, "Early (≤30 days)")
 if (!is.null(early_results)) {
     print(early_results$plot)
     ggsave("Results2/Feedback_Analysis/Patient_Phenotype/MMF_0R_Samples_Early.png", 
            early_results$plot, width = 10, height = 6, dpi = 300)
 }
 
-late_results <- analyze_stratum(mmf_data, "Late (>30 days)")
+late_results <- analyze_stratum(mpa_data, "Late (>30 days)")
 if (!is.null(late_results)) {
     print(late_results$plot)
     ggsave("Results2/Feedback_Analysis/Patient_Phenotype/MMF_0R_Samples_Late.png", 
@@ -210,12 +210,12 @@ cat("NOTE: Removing very early post-transplant samples (POD<10)\n\n")
 # Filter out POD<10 samples
 mmf_0r_only_pod10plus <- patients_with_0R_only %>%
     filter(POD >= 10) %>%
-    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
     mutate(Patient_Phenotype = "0R-only patients")
 
 mmf_0r_from_2r_pod10plus <- patients_with_2R %>%
     filter(ACR == "0R", POD >= 10) %>%
-    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
     mutate(Patient_Phenotype = "2R patients (0R samples)")
 
 mmf_data_pod10plus <- bind_rows(mmf_0r_only_pod10plus, mmf_0r_from_2r_pod10plus)
@@ -253,12 +253,12 @@ cat("NOTE: Focusing on acute post-transplant window (POD 10-45)\n\n")
 # Filter to POD 10-45 only
 mmf_0r_only_pod10_45 <- patients_with_0R_only %>%
     filter(POD >= 10 & POD <= 45) %>%
-    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
     mutate(Patient_Phenotype = "0R-only patients")
 
 mmf_0r_from_2r_pod10_45 <- patients_with_2R %>%
     filter(ACR == "0R", POD >= 10, POD <= 45) %>%
-    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
     mutate(Patient_Phenotype = "2R patients (0R samples)")
 
 mmf_data_pod10_45 <- bind_rows(mmf_0r_only_pod10_45, mmf_0r_from_2r_pod10_45)
@@ -329,38 +329,38 @@ cat("\n=== CLINICAL INTERPRETATION ===\n\n")
 cat("This is the CLEANEST patient-level comparison:\n")
 cat("  - Same rejection state (0R) in both groups\n")
 cat("  - Controls for acute inflammatory effects of rejection\n")
-cat("  - Tests inherent patient-level differences in MMF during quiescence\n\n")
+cat("  - Tests inherent patient-level differences in MPA during quiescence\n\n")
 
 cat("Patient Groups:\n")
 cat("  - 0R-only patients: Never have ANY rejection (n=", 
-    length(unique(mmf_0r_only$H)), " patients)\n", sep = "")
+    length(unique(mpa_0r_only$H)), " patients)\n", sep = "")
 cat("  - 2R patients (0R samples): Samples taken when NOT rejecting from patients who DO develop 2R (n=", 
-    length(unique(mmf_0r_from_2r$H)), " patients)\n\n", sep = "")
+    length(unique(mpa_0r_from_2r$H)), " patients)\n\n", sep = "")
 
 cat("Key Questions Addressed:\n")
-cat("  1. Do rejection-prone patients have lower MMF levels even when NOT rejecting?\n")
-cat("  2. Can baseline MMF levels predict future rejection risk?\n")
+cat("  1. Do rejection-prone patients have lower MPA levels even when NOT rejecting?\n")
+cat("  2. Can baseline MPA levels predict future rejection risk?\n")
 cat("  3. Are patient-level differences independent of rejection state?\n\n")
 
 cat("Comparison with other analyses:\n")
-cat("  08_MMF_POD.R:  Within-patient comparison (0R vs 2R+ in same patients)\n")
+cat("  08_MPA_POD.R:  Within-patient comparison (0R vs 2R+ in same patients)\n")
 cat("                 → Tests rejection STATE effects\n\n")
-cat("  08a_MMF_POD.R: 0R/1R-only patients vs 2R+ samples from 2R patients\n")
+cat("  08a_MPA_POD.R: 0R/1R-only patients vs 2R+ samples from 2R patients\n")
 cat("                 → Confounds patient phenotype AND rejection state\n\n")
-cat("  08b_MMF_POD.R: 0R-only patients vs ALL samples from 2R patients\n")
+cat("  08b_MPA_POD.R: 0R-only patients vs ALL samples from 2R patients\n")
 cat("                 → Patient phenotype with mixed rejection states\n\n")
 cat("  08c_MMF_POD.R: 0R from 0R-only patients vs 0R from 2R patients (THIS SCRIPT)\n")
 cat("                 → Pure patient phenotype, rejection state controlled ✓\n\n")
 
 cat("Clinical Implications:\n")
-cat("  - If significant: MMF levels during quiescence differ by rejection phenotype\n")
+cat("  - If significant: MPA levels during quiescence differ by rejection phenotype\n")
 cat("    → Suggests inherent patient-level pharmacokinetic/pharmacodynamic differences\n")
 cat("    → Potential for early risk stratification\n")
 cat("  - If not significant: Rejection appears to be STATE-dependent, not phenotype\n")
 cat("    → Focus on monitoring during at-risk periods\n\n")
 
 # ============================================================================
-# PART 5: ADDITIONAL COMPARISON - 0R/1R samples
+#- PART 5: ADDITIONAL COMPARISON - 0R/1R samples
 # ============================================================================
 
 cat("\n\n" , rep("=", 76), "\n", sep = "")
@@ -387,39 +387,39 @@ cat("=== OVERALL 0R/1R SAMPLE COMPARISON ===\n")
 cat("Comparing: All 0R/1R samples from 0R/1R-only patients vs 0R/1R samples from 2R patients\n\n")
 
 # Get all samples from 0R/1R-only patients (they only have 0R/1R samples)
-mmf_0r1r_only <- patients_with_0R_1R_only %>%
-    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+mpa_0r1r_only <- patients_with_0R_1R_only %>%
+    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
     mutate(Patient_Phenotype = "0R/1R-only patients")
 
 # Get ONLY 0R/1R samples from patients who develop 2R
-mmf_0r1r_from_2r <- patients_with_2R %>%
+mpa_0r1r_from_2r <- patients_with_2R %>%
     filter(ACR %in% c("0R", "1R")) %>%
-    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
     mutate(Patient_Phenotype = "2R patients (0R/1R samples)")
 
 # Combine for comparison
-mmf_data_0r1r <- bind_rows(mmf_0r1r_only, mmf_0r1r_from_2r)
+mmf_data_0r1r <- bind_rows(mpa_0r1r_only, mpa_0r1r_from_2r)
 
 cat("Sample sizes:\n")
-cat("  0R/1R samples from 0R/1R-only patients:", nrow(mmf_0r1r_only), "samples from", 
-    length(unique(mmf_0r1r_only$H)), "patients\n")
-cat("    - 0R:", sum(mmf_0r1r_only$ACR == "0R"), ", 1R:", sum(mmf_0r1r_only$ACR == "1R"), "\n")
-cat("  0R/1R samples from 2R patients:", nrow(mmf_0r1r_from_2r), "samples from", 
-    length(unique(mmf_0r1r_from_2r$H)), "patients\n")
-cat("    - 0R:", sum(mmf_0r1r_from_2r$ACR == "0R"), ", 1R:", sum(mmf_0r1r_from_2r$ACR == "1R"), "\n\n")
+cat("  0R/1R samples from 0R/1R-only patients:", nrow(mpa_0r1r_only), "samples from", 
+    length(unique(mpa_0r1r_only$H)), "patients\n")
+cat("    - 0R:", sum(mpa_0r1r_only$ACR == "0R"), ", 1R:", sum(mpa_0r1r_only$ACR == "1R"), "\n")
+cat("  0R/1R samples from 2R patients:", nrow(mpa_0r1r_from_2r), "samples from", 
+    length(unique(mpa_0r1r_from_2r$H)), "patients\n")
+cat("    - 0R:", sum(mpa_0r1r_from_2r$ACR == "0R"), ", 1R:", sum(mpa_0r1r_from_2r$ACR == "1R"), "\n\n")
 
 # Run Wilcoxon tests
-cat("Mycophenolate C18:\n")
+cat("MPA (C18):\n")
 wilcox_c18_0r1r <- wilcox.test(
-    `Mycophenolate..C18.` ~ Patient_Phenotype, 
+    `MPA..C18.` ~ Patient_Phenotype, 
     data = mmf_data_0r1r, 
     exact = FALSE
 )
 print(wilcox_c18_0r1r)
 
-cat("\nMycophenolate HILIC:\n")
+cat("\nMPA (HILIC):\n")
 wilcox_hilic_0r1r <- wilcox.test(
-    `Mycophenolate..HILIC.` ~ Patient_Phenotype, 
+    `MPA..HILIC.` ~ Patient_Phenotype, 
     data = mmf_data_0r1r, 
     exact = FALSE
 )
@@ -430,21 +430,21 @@ medians_0r1r <- mmf_data_0r1r %>%
     group_by(Patient_Phenotype) %>%
     summarise(
         n = n(),
-        median_C18 = median(`Mycophenolate..C18.`, na.rm = TRUE),
-        median_HILIC = median(`Mycophenolate..HILIC.`, na.rm = TRUE)
+        median_C18 = median(`MPA..C18.`, na.rm = TRUE),
+        median_HILIC = median(`MPA..HILIC.`, na.rm = TRUE)
     )
 print(medians_0r1r)
 
 # Plot overall comparison
 mmf_long_0r1r <- mmf_data_0r1r %>%
-    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
+    pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
                  names_to = "Metabolite",
                  values_to = "Level") %>%
     mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
 
 # Get sample sizes for x-axis labels
-n_0r1r_only <- nrow(mmf_0r1r_only)
-n_0r1r_from_2r <- nrow(mmf_0r1r_from_2r)
+n_0r1r_only <- nrow(mpa_0r1r_only)
+n_0r1r_from_2r <- nrow(mpa_0r1r_from_2r)
 
 p_overall_0r1r <- ggplot(mmf_long_0r1r, aes(x = Patient_Phenotype, y = Level, fill = Patient_Phenotype)) +
     geom_boxplot(alpha = 0.7, outlier.shape = NA) +
@@ -455,7 +455,7 @@ p_overall_0r1r <- ggplot(mmf_long_0r1r, aes(x = Patient_Phenotype, y = Level, fi
                                   "2R patients (0R/1R samples)" = "lightcoral")) +
     scale_x_discrete(labels = c("0R/1R-only patients" = paste0("0R/1R-only\npatients\n(n=", n_0r1r_only, ")"),
                                 "2R patients (0R/1R samples)" = paste0("2R patients\n(0R/1R samples)\n(n=", n_0r1r_from_2r, ")"))) +
-    labs(title = "MMF Levels in 0R/1R Samples: Patient Phenotype Comparison",
+    labs(title = "MPA Levels in 0R/1R Samples: Baseline State Comparison",
          subtitle = paste0("0R/1R-only patients vs 0R/1R samples from 2R patients | C18: p=", 
                           round(wilcox_c18_0r1r$p.value, 3), "; HILIC: p=", round(wilcox_hilic_0r1r$p.value, 3)),
          x = "Patient Phenotype", y = "Level") +
@@ -496,9 +496,9 @@ analyze_stratum_0r1r <- function(data, stratum) {
     }
     
     # Wilcoxon tests
-    w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ Patient_Phenotype, 
+    w_c18 <- wilcox.test(`MPA..C18.` ~ Patient_Phenotype, 
                          data = stratum_data, exact = FALSE)
-    w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ Patient_Phenotype, 
+    w_hilic <- wilcox.test(`MPA..HILIC.` ~ Patient_Phenotype, 
                            data = stratum_data, exact = FALSE)
     
     cat("C18:   p =", round(w_c18$p.value, 3), "\n")
@@ -508,15 +508,15 @@ analyze_stratum_0r1r <- function(data, stratum) {
     meds <- stratum_data %>%
         group_by(Patient_Phenotype) %>%
         summarise(
-            median_C18 = median(`Mycophenolate..C18.`, na.rm = TRUE),
-            median_HILIC = median(`Mycophenolate..HILIC.`, na.rm = TRUE)
+            median_C18 = median(`MPA..C18.`, na.rm = TRUE),
+            median_HILIC = median(`MPA..HILIC.`, na.rm = TRUE)
         )
     print(meds)
     cat("\n")
     
     # Create plot
     stratum_long <- stratum_data %>%
-        pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
+        pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
                      names_to = "Metabolite", values_to = "Level") %>%
         mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
     
@@ -529,7 +529,7 @@ analyze_stratum_0r1r <- function(data, stratum) {
                                       "2R patients (0R/1R samples)" = "lightcoral")) +
         scale_x_discrete(labels = c("0R/1R-only patients" = paste0("0R/1R-only\npatients\n(n=", n_0r1r_only, ")"),
                                     "2R patients (0R/1R samples)" = paste0("2R patients\n(0R/1R samples)\n(n=", n_0r1r_from_2r, ")"))) +
-        labs(title = paste("MMF Levels in 0R/1R Samples:", stratum),
+        labs(title = paste("MPA Levels in 0R/1R Samples:", stratum),
              subtitle = paste0("Patient phenotype comparison | C18: p=", round(w_c18$p.value, 3), 
                               "; HILIC: p=", round(w_hilic$p.value, 3)),
              x = "Patient Phenotype", y = "Level") +
@@ -565,12 +565,12 @@ cat("NOTE: Removing very early post-transplant samples (POD<10)\n\n")
 # Filter out POD<10 samples
 mmf_0r1r_only_pod10plus <- patients_with_0R_1R_only %>%
     filter(POD >= 10) %>%
-    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
     mutate(Patient_Phenotype = "0R/1R-only patients")
 
 mmf_0r1r_from_2r_pod10plus <- patients_with_2R %>%
     filter(ACR %in% c("0R", "1R"), POD >= 10) %>%
-    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
+    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
     mutate(Patient_Phenotype = "2R patients (0R/1R samples)")
 
 mmf_data_0r1r_pod10plus <- bind_rows(mmf_0r1r_only_pod10plus, mmf_0r1r_from_2r_pod10plus)
