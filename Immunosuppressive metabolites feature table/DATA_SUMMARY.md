@@ -87,9 +87,9 @@ Among the **18 patients** who ever develop 2R+ rejection:
 **Total metabolites:** 14
 
 ### MPA (Mycophenolic Acid) Metabolites (n=3)
-1. `MPA (C18)` - Active metabolite measured in serum, C18 chromatography
-2. `MPA (HILIC)` - Active metabolite measured in serum, HILIC chromatography
-3. `MPAG (C18)` - **Inactive metabolite (glucuronide), renally cleared**
+1. `Mycophenolate (C18)`
+2. `Mycophenolate (HILIC)`
+3. `Mycophenolic acid O-acyl glucuronide (C18)`
 
 ### Corticosteroid Metabolites (n=11)
 4. `11-Dehydrocorticosterone (HILIC)`

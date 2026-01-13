@@ -34,7 +34,7 @@ cat("\n=== MERGING METABOLITE AND CLINICAL DATA ===\n\n")
 # Get MPA data and merge with age
 mmf_age_data <- patients_with_2R %>%
     filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R")) %>%
     left_join(clinical_data %>% select(H, Age, Race, Sex, BMI), by = "H")
 
@@ -102,23 +102,23 @@ analyze_by_age <- function(data, age_group_name, age_var = "Age_Group") {
     
     # Wilcoxon tests for C18
     cat("--- MPA (C18) ---\n")
-    w_c18 <- wilcox.test(`MPA..C18.` ~ ACR_Group, 
+    w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ ACR_Group, 
                          data = age_data, exact = FALSE)
     cat("p-value:", round(w_c18$p.value, 4), "\n")
-    cat("Median 0R:", round(median(age_data$`MPA..C18.`[age_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
-    cat("Median 2R+:", round(median(age_data$`MPA..C18.`[age_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
+    cat("Median 0R:", round(median(age_data$`Mycophenolate..C18.`[age_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
+    cat("Median 2R+:", round(median(age_data$`Mycophenolate..C18.`[age_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
     
     # Wilcoxon tests for HILIC
     cat("--- MPA (HILIC) ---\n")
-    w_hilic <- wilcox.test(`MPA..HILIC.` ~ ACR_Group, 
+    w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ ACR_Group, 
                            data = age_data, exact = FALSE)
     cat("p-value:", round(w_hilic$p.value, 4), "\n")
-    cat("Median 0R:", round(median(age_data$`MPA..HILIC.`[age_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
-    cat("Median 2R+:", round(median(age_data$`MPA..HILIC.`[age_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
+    cat("Median 0R:", round(median(age_data$`Mycophenolate..HILIC.`[age_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
+    cat("Median 2R+:", round(median(age_data$`Mycophenolate..HILIC.`[age_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
     
     # Create plot
     age_long <- age_data %>%
-        pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+        pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                      names_to = "Metabolite",
                      values_to = "Level") %>%
         mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
@@ -254,7 +254,7 @@ cat("\n=== CREATING COMBINED AGE COMPARISON PLOTS ===\n\n")
 # Create a combined plot showing all age groups together (3-group)
 mmf_age_long_3 <- mmf_age_data %>%
     filter(!is.na(Age_Group)) %>%
-    pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                  names_to = "Metabolite",
                  values_to = "Level") %>%
     mutate(Metabolite = gsub("\\.\\.", " ", Metabolite),
@@ -280,7 +280,7 @@ ggsave("Results2/Feedback_Analysis/Age_Stratified/MMF_All_Ages_3groups_Combined.
 # Create a combined plot for binary age groups
 mmf_age_long_binary <- mmf_age_data %>%
     filter(!is.na(Age_Binary)) %>%
-    pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                  names_to = "Metabolite",
                  values_to = "Level") %>%
     mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))

@@ -55,13 +55,13 @@ cat("\n=== MERGING METABOLITE AND CLINICAL DATA ===\n\n")
 # Get MPAG data and merge with GFR
 mpag_gfr_data <- patients_with_2R %>%
     filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
-    select(H, POD, ACR, `MPAG..C18.`) %>%
+    select(H, POD, ACR, `Mycophenolic.acid.O.acyl.glucuronide..C18.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R")) %>%
     left_join(clinical_data %>% select(H, GFR, GFR_Category, Age, Sex, Race, BMI), by = "H")
 
 cat("Total samples after merge:", nrow(mpag_gfr_data), "\n")
 cat("Samples with GFR information:", sum(!is.na(mpag_gfr_data$GFR)), "\n")
-cat("Samples with MPAG data:", sum(!is.na(mpag_gfr_data$`MPAG..C18.`)), "\n\n")
+cat("Samples with MPAG data:", sum(!is.na(mpag_gfr_data$`Mycophenolic.acid.O.acyl.glucuronide..C18.`)), "\n\n")
 
 # Check GFR category distribution in merged data
 cat("GFR Category distribution in merged data:\n")
@@ -106,14 +106,14 @@ analyze_mpag_by_gfr <- function(data, gfr_category) {
     
     # Wilcoxon test for MPAG
     cat("--- Mycophenolic Acid O-Acyl Glucuronide C18 ---\n")
-    w_mpag <- wilcox.test(`MPAG..C18.` ~ ACR_Group, 
+    w_mpag <- wilcox.test(`Mycophenolic.acid.O.acyl.glucuronide..C18.` ~ ACR_Group, 
                           data = gfr_data, exact = FALSE)
     cat("p-value:", round(w_mpag$p.value, 4), "\n")
-    cat("Median 0R:", round(median(gfr_data$`MPAG..C18.`[gfr_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
-    cat("Median 2R+:", round(median(gfr_data$`MPAG..C18.`[gfr_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
+    cat("Median 0R:", round(median(gfr_data$`Mycophenolic.acid.O.acyl.glucuronide..C18.`[gfr_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
+    cat("Median 2R+:", round(median(gfr_data$`Mycophenolic.acid.O.acyl.glucuronide..C18.`[gfr_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
     
     # Create plot
-    p <- ggplot(gfr_data, aes(x = ACR_Group, y = `MPAG..C18.`, fill = ACR_Group)) +
+    p <- ggplot(gfr_data, aes(x = ACR_Group, y = `Mycophenolic.acid.O.acyl.glucuronide..C18.`, fill = ACR_Group)) +
         geom_boxplot(alpha = 0.7, outlier.shape = NA) +
         geom_jitter(width = 0.2, alpha = 0.5) +
         stat_summary(fun = median, geom = "point", color = "red", size = 3, shape = 18) +
@@ -132,8 +132,8 @@ analyze_mpag_by_gfr <- function(data, gfr_category) {
         n_0r = n_0r,
         n_2r = n_2r,
         p_value = w_mpag$p.value,
-        median_0r = median(gfr_data$`MPAG..C18.`[gfr_data$ACR_Group == "0R"], na.rm = TRUE),
-        median_2r = median(gfr_data$`MPAG..C18.`[gfr_data$ACR_Group == "2R+"], na.rm = TRUE),
+        median_0r = median(gfr_data$`Mycophenolic.acid.O.acyl.glucuronide..C18.`[gfr_data$ACR_Group == "0R"], na.rm = TRUE),
+        median_2r = median(gfr_data$`Mycophenolic.acid.O.acyl.glucuronide..C18.`[gfr_data$ACR_Group == "2R+"], na.rm = TRUE),
         gfr_min = min(gfr_data$GFR, na.rm = TRUE),
         gfr_max = max(gfr_data$GFR, na.rm = TRUE)
     ))
@@ -209,7 +209,7 @@ mpag_gfr_long <- mpag_gfr_data %>%
     filter(!is.na(GFR_Category)) %>%
     mutate(GFR_Category = factor(GFR_Category, levels = gfr_order))
 
-p_combined <- ggplot(mpag_gfr_long, aes(x = ACR_Group, y = `MPAG..C18.`, fill = ACR_Group)) +
+p_combined <- ggplot(mpag_gfr_long, aes(x = ACR_Group, y = `Mycophenolic.acid.O.acyl.glucuronide..C18.`, fill = ACR_Group)) +
     geom_boxplot(alpha = 0.7, outlier.shape = NA) +
     geom_jitter(width = 0.2, alpha = 0.3, size = 0.8) +
     facet_wrap(~ GFR_Category, scales = "free_y") +
@@ -243,25 +243,25 @@ cat("NOTE: Expecting STRONGER negative correlation than MPA (renal clearance!)\n
 
 # Overall correlation (all samples)
 cat("--- Overall (All Samples) ---\n")
-mpag_complete <- mpag_gfr_data %>% filter(!is.na(GFR) & !is.na(`MPAG..C18.`))
-cor_overall <- cor.test(mpag_complete$GFR, mpag_complete$`MPAG..C18.`)
+mpag_complete <- mpag_gfr_data %>% filter(!is.na(GFR) & !is.na(`Mycophenolic.acid.O.acyl.glucuronide..C18.`))
+cor_overall <- cor.test(mpag_complete$GFR, mpag_complete$`Mycophenolic.acid.O.acyl.glucuronide..C18.`)
 cat("Correlation: r =", round(cor_overall$estimate, 3), ", p =", round(cor_overall$p.value, 4), "\n\n")
 
 # Correlation within 0R group
 cat("--- 0R Group ---\n")
-mpag_0r <- mpag_gfr_data %>% filter(ACR_Group == "0R" & !is.na(GFR) & !is.na(`MPAG..C18.`))
-cor_0r <- cor.test(mpag_0r$GFR, mpag_0r$`MPAG..C18.`)
+mpag_0r <- mpag_gfr_data %>% filter(ACR_Group == "0R" & !is.na(GFR) & !is.na(`Mycophenolic.acid.O.acyl.glucuronide..C18.`))
+cor_0r <- cor.test(mpag_0r$GFR, mpag_0r$`Mycophenolic.acid.O.acyl.glucuronide..C18.`)
 cat("Correlation: r =", round(cor_0r$estimate, 3), ", p =", round(cor_0r$p.value, 4), "\n\n")
 
 # Correlation within 2R+ group
 cat("--- 2R+ Group ---\n")
-mpag_2r <- mpag_gfr_data %>% filter(ACR_Group == "2R+" & !is.na(GFR) & !is.na(`MPAG..C18.`))
-cor_2r <- cor.test(mpag_2r$GFR, mpag_2r$`MPAG..C18.`)
+mpag_2r <- mpag_gfr_data %>% filter(ACR_Group == "2R+" & !is.na(GFR) & !is.na(`Mycophenolic.acid.O.acyl.glucuronide..C18.`))
+cor_2r <- cor.test(mpag_2r$GFR, mpag_2r$`Mycophenolic.acid.O.acyl.glucuronide..C18.`)
 cat("Correlation: r =", round(cor_2r$estimate, 3), ", p =", round(cor_2r$p.value, 4), "\n\n")
 
 # Scatter plot with correlation annotations
 p_scatter <- ggplot(mpag_gfr_data %>% filter(!is.na(GFR)), 
-                    aes(x = GFR, y = `MPAG..C18.`, color = ACR_Group)) +
+                    aes(x = GFR, y = `Mycophenolic.acid.O.acyl.glucuronide..C18.`, color = ACR_Group)) +
     geom_point(alpha = 0.6) +
     geom_smooth(method = "lm", se = TRUE) +
     scale_color_manual(values = c("0R" = "blue", "2R+" = "red")) +
@@ -281,7 +281,7 @@ ggsave("Results2/Feedback_Analysis/MPAG_GFR_Stratified/GFR_vs_MPAG_Scatter.png",
        width = 10, height = 6, dpi = 300)
 
 # Create separate scatter plots for better visibility
-p_scatter_0r <- ggplot(mpag_0r, aes(x = GFR, y = `MPAG..C18.`)) +
+p_scatter_0r <- ggplot(mpag_0r, aes(x = GFR, y = `Mycophenolic.acid.O.acyl.glucuronide..C18.`)) +
     geom_point(alpha = 0.6, color = "blue") +
     geom_smooth(method = "lm", se = TRUE, color = "blue") +
     labs(title = "GFR vs MPAG: 0R Samples Only",
@@ -290,7 +290,7 @@ p_scatter_0r <- ggplot(mpag_0r, aes(x = GFR, y = `MPAG..C18.`)) +
          y = "MPAG C18 Level") +
     theme_minimal()
 
-p_scatter_2r <- ggplot(mpag_2r, aes(x = GFR, y = `MPAG..C18.`)) +
+p_scatter_2r <- ggplot(mpag_2r, aes(x = GFR, y = `Mycophenolic.acid.O.acyl.glucuronide..C18.`)) +
     geom_point(alpha = 0.6, color = "red") +
     geom_smooth(method = "lm", se = TRUE, color = "red") +
     labs(title = "GFR vs MPAG: 2R+ Samples Only",
@@ -315,11 +315,11 @@ cat("\n\n=== TESTING FOR GFR x ACR INTERACTION ===\n\n")
 
 # Test if the effect of ACR differs by GFR (as continuous variable)
 mpag_gfr_complete <- mpag_gfr_data %>% 
-    filter(!is.na(GFR) & !is.na(ACR_Group) & !is.na(`MPAG..C18.`))
+    filter(!is.na(GFR) & !is.na(ACR_Group) & !is.na(`Mycophenolic.acid.O.acyl.glucuronide..C18.`))
 
 # Linear model with interaction
 cat("--- MPAG C18 ---\n")
-model_mpag <- lm(`MPAG..C18.` ~ GFR * ACR_Group, data = mpag_gfr_complete)
+model_mpag <- lm(`Mycophenolic.acid.O.acyl.glucuronide..C18.` ~ GFR * ACR_Group, data = mpag_gfr_complete)
 cat("Model coefficients:\n")
 print(summary(model_mpag)$coefficients)
 

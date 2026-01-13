@@ -27,7 +27,7 @@ cat("\n=== MERGING METABOLITE AND CLINICAL DATA ===\n\n")
 # Get MPA data and merge with sex
 mmf_sex_data <- patients_with_2R %>%
     filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R")) %>%
     left_join(clinical_data %>% select(H, Sex, Age, Race, BMI), by = "H")
 
@@ -70,23 +70,23 @@ analyze_by_sex <- function(data, sex_group) {
     
     # Wilcoxon tests for C18
     cat("--- MPA (C18) ---\n")
-    w_c18 <- wilcox.test(`MPA..C18.` ~ ACR_Group, 
+    w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ ACR_Group, 
                          data = sex_data, exact = FALSE)
     cat("p-value:", round(w_c18$p.value, 4), "\n")
-    cat("Median 0R:", round(median(sex_data$`MPA..C18.`[sex_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
-    cat("Median 2R+:", round(median(sex_data$`MPA..C18.`[sex_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
+    cat("Median 0R:", round(median(sex_data$`Mycophenolate..C18.`[sex_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
+    cat("Median 2R+:", round(median(sex_data$`Mycophenolate..C18.`[sex_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
     
     # Wilcoxon tests for HILIC
     cat("--- MPA (HILIC) ---\n")
-    w_hilic <- wilcox.test(`MPA..HILIC.` ~ ACR_Group, 
+    w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ ACR_Group, 
                            data = sex_data, exact = FALSE)
     cat("p-value:", round(w_hilic$p.value, 4), "\n")
-    cat("Median 0R:", round(median(sex_data$`MPA..HILIC.`[sex_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
-    cat("Median 2R+:", round(median(sex_data$`MPA..HILIC.`[sex_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
+    cat("Median 0R:", round(median(sex_data$`Mycophenolate..HILIC.`[sex_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
+    cat("Median 2R+:", round(median(sex_data$`Mycophenolate..HILIC.`[sex_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
     
     # Create plot
     sex_long <- sex_data %>%
-        pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+        pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                      names_to = "Metabolite",
                      values_to = "Level") %>%
         mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
@@ -113,10 +113,10 @@ analyze_by_sex <- function(data, sex_group) {
         n_2r = n_2r,
         p_c18 = w_c18$p.value,
         p_hilic = w_hilic$p.value,
-        median_0r_c18 = median(sex_data$`MPA..C18.`[sex_data$ACR_Group == "0R"], na.rm = TRUE),
-        median_2r_c18 = median(sex_data$`MPA..C18.`[sex_data$ACR_Group == "2R+"], na.rm = TRUE),
-        median_0r_hilic = median(sex_data$`MPA..HILIC.`[sex_data$ACR_Group == "0R"], na.rm = TRUE),
-        median_2r_hilic = median(sex_data$`MPA..HILIC.`[sex_data$ACR_Group == "2R+"], na.rm = TRUE)
+        median_0r_c18 = median(sex_data$`Mycophenolate..C18.`[sex_data$ACR_Group == "0R"], na.rm = TRUE),
+        median_2r_c18 = median(sex_data$`Mycophenolate..C18.`[sex_data$ACR_Group == "2R+"], na.rm = TRUE),
+        median_0r_hilic = median(sex_data$`Mycophenolate..HILIC.`[sex_data$ACR_Group == "0R"], na.rm = TRUE),
+        median_2r_hilic = median(sex_data$`Mycophenolate..HILIC.`[sex_data$ACR_Group == "2R+"], na.rm = TRUE)
     ))
 }
 
@@ -180,7 +180,7 @@ cat("\n=== CREATING COMBINED SEX COMPARISON PLOT ===\n\n")
 # Create a combined plot showing all sex groups together
 mmf_sex_long <- mmf_sex_data %>%
     filter(!is.na(Sex)) %>%
-    pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                  names_to = "Metabolite",
                  values_to = "Level") %>%
     mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
@@ -221,13 +221,13 @@ mmf_sex_complete <- mmf_sex_data %>%
 
 # Linear model with interaction for C18
 cat("--- MPA (C18) ---\n")
-model_c18 <- lm(`MPA..C18.` ~ Sex * ACR_Group, data = mmf_sex_complete)
+model_c18 <- lm(`Mycophenolate..C18.` ~ Sex * ACR_Group, data = mmf_sex_complete)
 cat("Interaction effect:\n")
 print(summary(model_c18)$coefficients)
 
 # Linear model with interaction for HILIC
 cat("\n--- MPA HILIC ---\n")
-model_hilic <- lm(`MPA..HILIC.` ~ Sex * ACR_Group, data = mmf_sex_complete)
+model_hilic <- lm(`Mycophenolate..HILIC.` ~ Sex * ACR_Group, data = mmf_sex_complete)
 cat("Interaction effect:\n")
 print(summary(model_hilic)$coefficients)
 

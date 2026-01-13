@@ -30,26 +30,22 @@
 
 ## Terminology Changes Throughout All Files
 
-### Text Changes
-- `MMF` → `MPA` (in titles, labels, text)
-- `Mycophenolate (C18)` → `MPA (C18)`
-- `Mycophenolate (HILIC)` → `MPA (HILIC)`
-- `Mycophenolic acid O-acyl-glucuronide` → `MPAG`
-- `MPA-glucuronide` → `MPAG`
+### What Changed ✅
+- **File names:** `*_MMF_*` → `*_MPA_*`
+- **Titles/Labels:** `"MMF"` → `"MPA"` (in plot titles, output text)
+- **Variable names:** `mmf_data` → `mpa_data`, `mmf_long` → `mpa_long`, etc.
+- **Plot filenames:** `MMF_Overall.png` → `MPA_Overall.png`, etc.
+- **Output text:** References to "MMF" in printed output → "MPA"
 
-### Variable Names
-- `mmf_data` → `mpa_data`
-- `mmf_long` → `mpa_long`
-- `mmf_0r_only` → `mpa_0r_only`
-- `mmf_2r_patients` → `mpa_2r_patients`
-- `mmf_0r1r_only` → `mpa_0r1r_only`
-- `mmf_metabolites` → `mpa_metabolites`
+### What Did NOT Change ❌
+- **Column names in data:** Still `Mycophenolate..C18.`, `Mycophenolate..HILIC.`, `Mycophenolic.acid.O.acyl.glucuronide..C18.`
+- **Column references in code:** Still use backticks with original names: `` `Mycophenolate..C18.` ``
+- **The actual data file:** `IS_metabolites_ACR.csv` unchanged
 
-### Plot Filenames
-- `MMF_Overall.png` → `MPA_Overall.png`
-- `MMF_Early.png` → `MPA_Early.png`
-- `MMF_Late.png` → `MPA_Late.png`
-- All other MMF_* plot files → MPA_*
+### Summary
+- **In the code:** Use original column names (`` `Mycophenolate..C18.` ``)
+- **In the output:** Display as "MPA (C18)", "MPA (HILIC)", "MPAG"
+- **In filenames/variables:** Use `mpa_*` naming
 
 ---
 
@@ -81,15 +77,20 @@
 
 ## Column Names in Data Files
 
-**NOTE:** The raw data file (`IS_metabolites_ACR.csv`) still has the original column names:
-- `Mycophenolate (C18)`
-- `Mycophenolate (HILIC)`  
-- `Mycophenolic acid O-acyl-glucuronide (C18)`
+**IMPORTANT:** The raw data file (`IS_metabolites_ACR.csv`) column names are **UNCHANGED**:
+- `Mycophenolate (C18)` → becomes `Mycophenolate..C18.` in R
+- `Mycophenolate (HILIC)` → becomes `Mycophenolate..HILIC.` in R
+- `Mycophenolic acid O-acyl-glucuronide (C18)` → becomes `Mycophenolic.acid.O.acyl.glucuronide..C18.` in R
 
-**This is intentional** - we don't modify raw data files. Instead:
-- R scripts reference these columns using backticks: `` `Mycophenolate..C18.` ``
-- After reading the data, they're referred to as "MPA" in variable names and plots
-- Output labels show "MPA (C18)", "MPA (HILIC)", and "MPAG"
+**In the R code:**
+- ✅ Use original column names: `` `Mycophenolate..C18.` ``
+- ✅ Use original column names: `` `Mycophenolic.acid.O.acyl.glucuronide..C18.` ``
+- ❌ Do NOT use: `` `MPA..C18.` `` (this will cause errors!)
+
+**In the output/labels:**
+- When displaying to user, show as "MPA (C18)", "MPA (HILIC)", "MPAG"
+- In plot titles, axis labels, printed text: use "MPA" terminology
+- The data transformation happens via `gsub("\\.\\.", " ", Metabolite)` after pivoting
 
 ---
 

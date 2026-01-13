@@ -58,7 +58,7 @@ cat("\n=== MERGING METABOLITE AND CLINICAL DATA ===\n\n")
 # Get MPA data and merge with GFR
 mmf_gfr_data <- patients_with_2R %>%
     filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R")) %>%
     left_join(clinical_data %>% select(H, GFR, GFR_Category, Age, Sex, Race, BMI), by = "H")
 
@@ -107,23 +107,23 @@ analyze_by_gfr <- function(data, gfr_category) {
     
     # Wilcoxon tests for C18
     cat("--- MPA (C18) ---\n")
-    w_c18 <- wilcox.test(`MPA..C18.` ~ ACR_Group, 
+    w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ ACR_Group, 
                          data = gfr_data, exact = FALSE)
     cat("p-value:", round(w_c18$p.value, 4), "\n")
-    cat("Median 0R:", round(median(gfr_data$`MPA..C18.`[gfr_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
-    cat("Median 2R+:", round(median(gfr_data$`MPA..C18.`[gfr_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
+    cat("Median 0R:", round(median(gfr_data$`Mycophenolate..C18.`[gfr_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
+    cat("Median 2R+:", round(median(gfr_data$`Mycophenolate..C18.`[gfr_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
     
     # Wilcoxon tests for HILIC
     cat("--- MPA (HILIC) ---\n")
-    w_hilic <- wilcox.test(`MPA..HILIC.` ~ ACR_Group, 
+    w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ ACR_Group, 
                            data = gfr_data, exact = FALSE)
     cat("p-value:", round(w_hilic$p.value, 4), "\n")
-    cat("Median 0R:", round(median(gfr_data$`MPA..HILIC.`[gfr_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
-    cat("Median 2R+:", round(median(gfr_data$`MPA..HILIC.`[gfr_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
+    cat("Median 0R:", round(median(gfr_data$`Mycophenolate..HILIC.`[gfr_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
+    cat("Median 2R+:", round(median(gfr_data$`Mycophenolate..HILIC.`[gfr_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
     
     # Create plot
     gfr_long <- gfr_data %>%
-        pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+        pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                      names_to = "Metabolite",
                      values_to = "Level") %>%
         mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
@@ -150,10 +150,10 @@ analyze_by_gfr <- function(data, gfr_category) {
         n_2r = n_2r,
         p_c18 = w_c18$p.value,
         p_hilic = w_hilic$p.value,
-        median_0r_c18 = median(gfr_data$`MPA..C18.`[gfr_data$ACR_Group == "0R"], na.rm = TRUE),
-        median_2r_c18 = median(gfr_data$`MPA..C18.`[gfr_data$ACR_Group == "2R+"], na.rm = TRUE),
-        median_0r_hilic = median(gfr_data$`MPA..HILIC.`[gfr_data$ACR_Group == "0R"], na.rm = TRUE),
-        median_2r_hilic = median(gfr_data$`MPA..HILIC.`[gfr_data$ACR_Group == "2R+"], na.rm = TRUE),
+        median_0r_c18 = median(gfr_data$`Mycophenolate..C18.`[gfr_data$ACR_Group == "0R"], na.rm = TRUE),
+        median_2r_c18 = median(gfr_data$`Mycophenolate..C18.`[gfr_data$ACR_Group == "2R+"], na.rm = TRUE),
+        median_0r_hilic = median(gfr_data$`Mycophenolate..HILIC.`[gfr_data$ACR_Group == "0R"], na.rm = TRUE),
+        median_2r_hilic = median(gfr_data$`Mycophenolate..HILIC.`[gfr_data$ACR_Group == "2R+"], na.rm = TRUE),
         gfr_min = min(gfr_data$GFR, na.rm = TRUE),
         gfr_max = max(gfr_data$GFR, na.rm = TRUE)
     ))
@@ -231,7 +231,7 @@ cat("\n=== CREATING COMBINED GFR COMPARISON PLOT ===\n\n")
 mmf_gfr_long <- mmf_gfr_data %>%
     filter(!is.na(GFR_Category)) %>%
     mutate(GFR_Category = factor(GFR_Category, levels = gfr_order)) %>%
-    pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                  names_to = "Metabolite",
                  values_to = "Level") %>%
     mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
@@ -270,22 +270,22 @@ cat("\n\n=== CORRELATION: GFR vs MPA LEVELS ===\n\n")
 # Correlation within 0R group
 cat("--- 0R Group ---\n")
 gfr_0r <- mmf_gfr_data %>% filter(ACR_Group == "0R" & !is.na(GFR))
-cor_0r_c18 <- cor.test(gfr_0r$GFR, gfr_0r$`MPA..C18.`)
-cor_0r_hilic <- cor.test(gfr_0r$GFR, gfr_0r$`MPA..HILIC.`)
+cor_0r_c18 <- cor.test(gfr_0r$GFR, gfr_0r$`Mycophenolate..C18.`)
+cor_0r_hilic <- cor.test(gfr_0r$GFR, gfr_0r$`Mycophenolate..HILIC.`)
 cat("C18 correlation: r =", round(cor_0r_c18$estimate, 3), ", p =", round(cor_0r_c18$p.value, 4), "\n")
 cat("HILIC correlation: r =", round(cor_0r_hilic$estimate, 3), ", p =", round(cor_0r_hilic$p.value, 4), "\n\n")
 
 # Correlation within 2R+ group
 cat("--- 2R+ Group ---\n")
 gfr_2r <- mmf_gfr_data %>% filter(ACR_Group == "2R+" & !is.na(GFR))
-cor_2r_c18 <- cor.test(gfr_2r$GFR, gfr_2r$`MPA..C18.`)
-cor_2r_hilic <- cor.test(gfr_2r$GFR, gfr_2r$`MPA..HILIC.`)
+cor_2r_c18 <- cor.test(gfr_2r$GFR, gfr_2r$`Mycophenolate..C18.`)
+cor_2r_hilic <- cor.test(gfr_2r$GFR, gfr_2r$`Mycophenolate..HILIC.`)
 cat("C18 correlation: r =", round(cor_2r_c18$estimate, 3), ", p =", round(cor_2r_c18$p.value, 4), "\n")
 cat("HILIC correlation: r =", round(cor_2r_hilic$estimate, 3), ", p =", round(cor_2r_hilic$p.value, 4), "\n\n")
 
 # Scatter plots with correlation annotations
 p_scatter_c18 <- ggplot(mmf_gfr_data %>% filter(!is.na(GFR)), 
-                        aes(x = GFR, y = `MPA..C18.`, color = ACR_Group)) +
+                        aes(x = GFR, y = `Mycophenolate..C18.`, color = ACR_Group)) +
     geom_point(alpha = 0.6) +
     geom_smooth(method = "lm", se = TRUE) +
     scale_color_manual(values = c("0R" = "blue", "2R+" = "red")) +
@@ -298,7 +298,7 @@ p_scatter_c18 <- ggplot(mmf_gfr_data %>% filter(!is.na(GFR)),
     theme_minimal()
 
 p_scatter_hilic <- ggplot(mmf_gfr_data %>% filter(!is.na(GFR)), 
-                          aes(x = GFR, y = `MPA..HILIC.`, color = ACR_Group)) +
+                          aes(x = GFR, y = `Mycophenolate..HILIC.`, color = ACR_Group)) +
     geom_point(alpha = 0.6) +
     geom_smooth(method = "lm", se = TRUE) +
     scale_color_manual(values = c("0R" = "blue", "2R+" = "red")) +
@@ -330,13 +330,13 @@ mmf_gfr_complete <- mmf_gfr_data %>%
 
 # Linear model with interaction for C18
 cat("--- MPA (C18) ---\n")
-model_c18 <- lm(`MPA..C18.` ~ GFR * ACR_Group, data = mmf_gfr_complete)
+model_c18 <- lm(`Mycophenolate..C18.` ~ GFR * ACR_Group, data = mmf_gfr_complete)
 cat("Interaction effect:\n")
 print(summary(model_c18)$coefficients)
 
 # Linear model with interaction for HILIC
 cat("\n--- MPA HILIC ---\n")
-model_hilic <- lm(`MPA..HILIC.` ~ GFR * ACR_Group, data = mmf_gfr_complete)
+model_hilic <- lm(`Mycophenolate..HILIC.` ~ GFR * ACR_Group, data = mmf_gfr_complete)
 cat("Interaction effect:\n")
 print(summary(model_hilic)$coefficients)
 

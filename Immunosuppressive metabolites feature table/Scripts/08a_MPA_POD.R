@@ -32,12 +32,12 @@ cat("NOTE: This tests inherent patient-level differences, not just rejection sta
 
 # Get all samples from 0R/1R-only patients
 mpa_0r1r_only <- patients_with_0R_1R_only %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(Patient_Group = "0R/1R-only patients")
 
 # Get ALL samples from patients who develop 2R (including their 0R, 1R, 2R+ samples)
 mpa_2r_patients <- patients_with_2R %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(Patient_Group = "2R patients (all samples)")
 
 # Combine for comparison
@@ -57,7 +57,7 @@ cat("    - 2R+ samples:", sum(grepl("^2R", mpa_2r_patients$ACR, ignore.case = TR
 # Run Wilcoxon tests
 cat("MPA (C18):\n")
 wilcox_c18 <- wilcox.test(
-    `MPA..C18.` ~ Patient_Group, 
+    `Mycophenolate..C18.` ~ Patient_Group, 
     data = mpa_data, 
     exact = FALSE
 )
@@ -65,7 +65,7 @@ print(wilcox_c18)
 
 cat("\nMPA (HILIC):\n")
 wilcox_hilic <- wilcox.test(
-    `MPA..HILIC.` ~ Patient_Group, 
+    `Mycophenolate..HILIC.` ~ Patient_Group, 
     data = mpa_data, 
     exact = FALSE
 )
@@ -73,7 +73,7 @@ print(wilcox_hilic)
 
 # Plot overall comparison
 mpa_long <- mpa_data %>%
-    pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                  names_to = "Metabolite",
                  values_to = "Level") %>%
     mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
@@ -126,9 +126,9 @@ analyze_stratum <- function(data, stratum) {
         "(0R/1R-only:", n_0r1r, ", 2R patients:", n_2r, ")\n\n")
     
     # Wilcoxon tests
-    w_c18 <- wilcox.test(`MPA..C18.` ~ Patient_Group, 
+    w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ Patient_Group, 
                          data = stratum_data, exact = FALSE)
-    w_hilic <- wilcox.test(`MPA..HILIC.` ~ Patient_Group, 
+    w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ Patient_Group, 
                            data = stratum_data, exact = FALSE)
     
     cat("C18:   p =", round(w_c18$p.value, 3), "\n")
@@ -136,7 +136,7 @@ analyze_stratum <- function(data, stratum) {
     
     # Create plot with sample sizes in x-axis labels
     stratum_long <- stratum_data %>%
-        pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+        pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                      names_to = "Metabolite", values_to = "Level") %>%
         mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
     
@@ -179,12 +179,12 @@ cat("NOTE: Removing very early post-transplant samples (POD<10)\n\n")
 # Filter out POD<10 samples
 mmf_0r1r_pod10plus <- patients_with_0R_1R_only %>%
     filter(POD >= 10) %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(Patient_Group = "0R/1R-only patients")
 
 mmf_2r_pod10plus <- patients_with_2R %>%
     filter(POD >= 10) %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(Patient_Group = "2R patients (all samples)")
 
 mmf_data_pod10plus <- bind_rows(mmf_0r1r_pod10plus, mmf_2r_pod10plus)
@@ -219,12 +219,12 @@ cat("      to focus on the acute post-transplant window\n\n")
 # Filter to POD 10-45 only
 mmf_0r1r_pod10_45 <- patients_with_0R_1R_only %>%
     filter(POD >= 10 & POD <= 45) %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(Patient_Group = "0R/1R-only patients")
 
 mmf_2r_pod10_45 <- patients_with_2R %>%
     filter(POD >= 10 & POD <= 45) %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(Patient_Group = "2R patients (all samples)")
 
 mmf_data_pod10_45 <- bind_rows(mmf_0r1r_pod10_45, mmf_2r_pod10_45)

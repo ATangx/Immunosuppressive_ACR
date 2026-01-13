@@ -18,13 +18,13 @@ cat("NOTE: Excluding 1R samples for clearer comparison\n\n")
 # Get MPA data - filter to keep only 0R and 2R+
 mpa_data <- patients_with_2R %>%
     filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R"))
 
 # Run Wilcoxon tests
 cat("MPA (C18):\n")
 wilcox_c18 <- wilcox.test(
-    `MPA..C18.` ~ ACR_Group, 
+    `Mycophenolate..C18.` ~ ACR_Group, 
     data = mpa_data, 
     exact = FALSE
 )
@@ -32,7 +32,7 @@ print(wilcox_c18)
 
 cat("\nMPA (HILIC):\n")
 wilcox_hilic <- wilcox.test(
-    `MPA..HILIC.` ~ ACR_Group, 
+    `Mycophenolate..HILIC.` ~ ACR_Group, 
     data = mpa_data, 
     exact = FALSE
 )
@@ -40,7 +40,7 @@ print(wilcox_hilic)
 
 # Plot overall comparison
 mpa_long <- mpa_data %>%
-    pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                  names_to = "Metabolite",
                  values_to = "Level") %>%
     mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
@@ -90,9 +90,9 @@ analyze_stratum <- function(data, stratum) {
         "(0R:", n_0r, ", 2R+:", n_2r, ")\n\n")
     
     # Wilcoxon tests
-    w_c18 <- wilcox.test(`MPA..C18.` ~ ACR_Group, 
+    w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ ACR_Group, 
                          data = stratum_data, exact = FALSE)
-    w_hilic <- wilcox.test(`MPA..HILIC.` ~ ACR_Group, 
+    w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ ACR_Group, 
                            data = stratum_data, exact = FALSE)
     
     cat("C18:   p =", round(w_c18$p.value, 3), "\n")
@@ -100,7 +100,7 @@ analyze_stratum <- function(data, stratum) {
     
     # Create plot with sample sizes in x-axis labels
     stratum_long <- stratum_data %>%
-        pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+        pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                      names_to = "Metabolite", values_to = "Level") %>%
         mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
     
@@ -146,7 +146,7 @@ cat("NOTE: Removing very early post-transplant samples (POD<10)\n\n")
 mmf_data_pod10plus <- patients_with_2R %>%
     filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
     filter(POD >= 10) %>%  # Exclude POD < 10
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R"))
 
 cat("Total samples with POD >= 10:", nrow(mmf_data_pod10plus), "\n")
@@ -180,7 +180,7 @@ cat("      to focus on the acute post-transplant window\n\n")
 mmf_data_pod10_45 <- patients_with_2R %>%
     filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
     filter(POD >= 10 & POD <= 45) %>%  # Keep only POD 10-45
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R"))
 
 cat("Total samples with POD 10-45:", nrow(mmf_data_pod10_45), "\n")
@@ -250,13 +250,13 @@ cat("NOTE: Grouping 0R and 1R together vs 2R+\n\n")
 # Get MPA data - include 0R, 1R, and 2R+
 mmf_data_01r <- patients_with_2R %>%
     filter(ACR %in% c("0R", "1R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R/1R"))
 
 # Run Wilcoxon tests
 cat("MPA (C18):\n")
 wilcox_c18_01r <- wilcox.test(
-    `MPA..C18.` ~ ACR_Group, 
+    `Mycophenolate..C18.` ~ ACR_Group, 
     data = mmf_data_01r, 
     exact = FALSE
 )
@@ -264,7 +264,7 @@ print(wilcox_c18_01r)
 
 cat("\nMPA (HILIC):\n")
 wilcox_hilic_01r <- wilcox.test(
-    `MPA..HILIC.` ~ ACR_Group, 
+    `Mycophenolate..HILIC.` ~ ACR_Group, 
     data = mmf_data_01r, 
     exact = FALSE
 )
@@ -272,7 +272,7 @@ print(wilcox_hilic_01r)
 
 # Plot overall comparison
 mmf_long_01r <- mmf_data_01r %>%
-    pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                  names_to = "Metabolite",
                  values_to = "Level") %>%
     mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
@@ -322,9 +322,9 @@ analyze_stratum_01r <- function(data, stratum) {
         "(0R/1R:", n_01r, ", 2R+:", n_2r, ")\n\n")
     
     # Wilcoxon tests
-    w_c18 <- wilcox.test(`MPA..C18.` ~ ACR_Group, 
+    w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ ACR_Group, 
                          data = stratum_data, exact = FALSE)
-    w_hilic <- wilcox.test(`MPA..HILIC.` ~ ACR_Group, 
+    w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ ACR_Group, 
                            data = stratum_data, exact = FALSE)
     
     cat("C18:   p =", round(w_c18$p.value, 3), "\n")
@@ -332,7 +332,7 @@ analyze_stratum_01r <- function(data, stratum) {
     
     # Create plot with sample sizes in x-axis labels
     stratum_long <- stratum_data %>%
-        pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+        pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                      names_to = "Metabolite", values_to = "Level") %>%
         mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
     
@@ -376,7 +376,7 @@ cat("NOTE: Removing very early post-transplant samples (POD<10)\n\n")
 mmf_data_01r_pod10plus <- patients_with_2R %>%
     filter(ACR %in% c("0R", "1R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
     filter(POD >= 10) %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R/1R"))
 
 cat("Total samples with POD >= 10:", nrow(mmf_data_01r_pod10plus), "\n")
@@ -410,7 +410,7 @@ cat("      to focus on the acute post-transplant window\n\n")
 mmf_data_01r_pod10_45 <- patients_with_2R %>%
     filter(ACR %in% c("0R", "1R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
     filter(POD >= 10 & POD <= 45) %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R/1R"))
 
 cat("Total samples with POD 10-45:", nrow(mmf_data_01r_pod10_45), "\n")
@@ -490,13 +490,13 @@ cat("NOTE: Excluding 1R samples for clearer comparison\n\n")
 # Get MPAG data - filter to keep only 0R and 2R+
 mpa_data <- patients_with_2R %>%
     filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
-    select(H, POD, ACR, `MPAG..C18.`) %>%
+    select(H, POD, ACR, `Mycophenolic.acid.O.acyl.glucuronide..C18.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R"))
 
 # Run Wilcoxon test
 cat("Mycophenolic acid O-acyl glucuronide C18:\n")
 wilcox_mpa <- wilcox.test(
-    `MPAG..C18.` ~ ACR_Group, 
+    `Mycophenolic.acid.O.acyl.glucuronide..C18.` ~ ACR_Group, 
     data = mpa_data, 
     exact = FALSE
 )
@@ -506,7 +506,7 @@ print(wilcox_mpa)
 n_0r_mpa <- sum(mpa_data$ACR_Group == "0R")
 n_2r_mpa <- sum(mpa_data$ACR_Group == "2R+")
 
-p_mpa_overall <- ggplot(mpa_data, aes(x = ACR_Group, y = `MPAG..C18.`, fill = ACR_Group)) +
+p_mpa_overall <- ggplot(mpa_data, aes(x = ACR_Group, y = `Mycophenolic.acid.O.acyl.glucuronide..C18.`, fill = ACR_Group)) +
     geom_boxplot(alpha = 0.7, outlier.shape = NA) +
     geom_jitter(width = 0.2, alpha = 0.5) +
     stat_summary(fun = median, geom = "point", color = "red", size = 3, shape = 18) +
@@ -520,7 +520,7 @@ p_mpa_overall <- ggplot(mpa_data, aes(x = ACR_Group, y = `MPAG..C18.`, fill = AC
     theme(legend.position = "none")
 
 print(p_mpa_overall)
-ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Overall.png", p_mpa_overall, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPAG_Overall.png", p_mpa_overall, 
        width = 8, height = 6, dpi = 300)
 
 # ============================================================================
@@ -545,13 +545,13 @@ analyze_stratum_mpa <- function(data, stratum) {
         "(0R:", n_0r, ", 2R+:", n_2r, ")\n\n")
     
     # Wilcoxon test
-    w_mpa <- wilcox.test(`MPAG..C18.` ~ ACR_Group, 
+    w_mpa <- wilcox.test(`Mycophenolic.acid.O.acyl.glucuronide..C18.` ~ ACR_Group, 
                          data = stratum_data, exact = FALSE)
     
     cat("MPAG: p =", round(w_mpa$p.value, 3), "\n\n")
     
     # Create plot
-    p <- ggplot(stratum_data, aes(x = ACR_Group, y = `MPAG..C18.`, fill = ACR_Group)) +
+    p <- ggplot(stratum_data, aes(x = ACR_Group, y = `Mycophenolic.acid.O.acyl.glucuronide..C18.`, fill = ACR_Group)) +
         geom_boxplot(alpha = 0.7, outlier.shape = NA) +
         geom_jitter(width = 0.2, alpha = 0.5) +
         stat_summary(fun = median, geom = "point", color = "red", size = 3, shape = 18) +
@@ -570,12 +570,12 @@ analyze_stratum_mpa <- function(data, stratum) {
 # Run for each stratum
 early_mpa <- analyze_stratum_mpa(mpa_data, "Early (≤30 days)")
 print(early_mpa$plot)
-ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Early.png", early_mpa$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPAG_Early.png", early_mpa$plot, 
        width = 8, height = 6, dpi = 300)
 
 late_mpa <- analyze_stratum_mpa(mpa_data, "Late (>30 days)")
 print(late_mpa$plot)
-ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Late.png", late_mpa$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPAG_Late.png", late_mpa$plot, 
        width = 8, height = 6, dpi = 300)
 
 # ============================================================================
@@ -589,7 +589,7 @@ cat("NOTE: Removing very early post-transplant samples (POD<10)\n\n")
 mpa_data_pod10plus <- patients_with_2R %>%
     filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
     filter(POD >= 10) %>%
-    select(H, POD, ACR, `MPAG..C18.`) %>%
+    select(H, POD, ACR, `Mycophenolic.acid.O.acyl.glucuronide..C18.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R"))
 
 cat("Total samples with POD >= 10:", nrow(mpa_data_pod10plus), "\n")
@@ -603,12 +603,12 @@ mpa_data_pod10plus <- mpa_data_pod10plus %>%
 # Run for each stratum
 early_mpa_pod10 <- analyze_stratum_mpa(mpa_data_pod10plus, "Early (10-30 days)")
 print(early_mpa_pod10$plot)
-ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Early_POD10plus.png", early_mpa_pod10$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPAG_Early_POD10plus.png", early_mpa_pod10$plot, 
        width = 8, height = 6, dpi = 300)
 
 late_mpa_pod10 <- analyze_stratum_mpa(mpa_data_pod10plus, "Late (>30 days)")
 print(late_mpa_pod10$plot)
-ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Late_POD10plus.png", late_mpa_pod10$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPAG_Late_POD10plus.png", late_mpa_pod10$plot, 
        width = 8, height = 6, dpi = 300)
 
 # ============================================================================
@@ -623,7 +623,7 @@ cat("      to focus on the acute post-transplant window\n\n")
 mpa_data_pod10_45 <- patients_with_2R %>%
     filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
     filter(POD >= 10 & POD <= 45) %>%
-    select(H, POD, ACR, `MPAG..C18.`) %>%
+    select(H, POD, ACR, `Mycophenolic.acid.O.acyl.glucuronide..C18.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R"))
 
 cat("Total samples with POD 10-45:", nrow(mpa_data_pod10_45), "\n")
@@ -637,12 +637,12 @@ mpa_data_pod10_45 <- mpa_data_pod10_45 %>%
 # Run for each stratum
 early_mpa_pod10_45 <- analyze_stratum_mpa(mpa_data_pod10_45, "Early (10-30 days)")
 print(early_mpa_pod10_45$plot)
-ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Early_POD10_45.png", early_mpa_pod10_45$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPAG_Early_POD10_45.png", early_mpa_pod10_45$plot, 
        width = 8, height = 6, dpi = 300)
 
 late_mpa_pod10_45 <- analyze_stratum_mpa(mpa_data_pod10_45, "Late (31-45 days)")
 print(late_mpa_pod10_45$plot)
-ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPA_Late_POD10_45.png", late_mpa_pod10_45$plot, 
+ggsave("Results2/Feedback_Analysis/POD_Stratified_new/MPAG_Late_POD10_45.png", late_mpa_pod10_45$plot, 
        width = 8, height = 6, dpi = 300)
 
 # ============================================================================
@@ -666,15 +666,15 @@ cat("   Late 31-45d:   p=", round(late_mpa_pod10_45$p_value, 3), "\n\n")
 
 cat("MPAG plots saved to: Results2/Feedback_Analysis/POD_Stratified_new/\n")
 cat("Original stratification:\n")
-cat("  - MPA_Overall.png\n")
-cat("  - MPA_Early.png\n")
-cat("  - MPA_Late.png\n\n")
+cat("  - MPAG_Overall.png\n")
+cat("  - MPAG_Early.png\n")
+cat("  - MPAG_Late.png\n\n")
 cat("Excluding POD<10:\n")
-cat("  - MPA_Early_POD10plus.png\n")
-cat("  - MPA_Late_POD10plus.png\n\n")
+cat("  - MPAG_Early_POD10plus.png\n")
+cat("  - MPAG_Late_POD10plus.png\n\n")
 cat("POD 10-45 only:\n")
-cat("  - MPA_Early_POD10_45.png\n")
-cat("  - MPA_Late_POD10_45.png\n\n")
+cat("  - MPAG_Early_POD10_45.png\n")
+cat("  - MPAG_Late_POD10_45.png\n\n")
 
 
 

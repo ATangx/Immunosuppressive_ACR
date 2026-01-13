@@ -27,7 +27,7 @@ cat("\n=== MERGING METABOLITE AND CLINICAL DATA ===\n\n")
 # Get MPA data and merge with race
 mmf_race_data <- patients_with_2R %>%
     filter(ACR %in% c("0R") | grepl("^2R", ACR, ignore.case = TRUE)) %>%
-    select(H, POD, ACR, `MPA..C18.`, `MPA..HILIC.`) %>%
+    select(H, POD, ACR, `Mycophenolate..C18.`, `Mycophenolate..HILIC.`) %>%
     mutate(ACR_Group = ifelse(grepl("^2R", ACR, ignore.case = TRUE), "2R+", "0R")) %>%
     left_join(clinical_data %>% select(H, Race, Age, Sex, BMI), by = "H")
 
@@ -70,23 +70,23 @@ analyze_by_race <- function(data, race_group) {
     
     # Wilcoxon tests for C18
     cat("--- MPA (C18) ---\n")
-    w_c18 <- wilcox.test(`MPA..C18.` ~ ACR_Group, 
+    w_c18 <- wilcox.test(`Mycophenolate..C18.` ~ ACR_Group, 
                          data = race_data, exact = FALSE)
     cat("p-value:", round(w_c18$p.value, 4), "\n")
-    cat("Median 0R:", round(median(race_data$`MPA..C18.`[race_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
-    cat("Median 2R+:", round(median(race_data$`MPA..C18.`[race_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
+    cat("Median 0R:", round(median(race_data$`Mycophenolate..C18.`[race_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
+    cat("Median 2R+:", round(median(race_data$`Mycophenolate..C18.`[race_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
     
     # Wilcoxon tests for HILIC
     cat("--- MPA (HILIC) ---\n")
-    w_hilic <- wilcox.test(`MPA..HILIC.` ~ ACR_Group, 
+    w_hilic <- wilcox.test(`Mycophenolate..HILIC.` ~ ACR_Group, 
                            data = race_data, exact = FALSE)
     cat("p-value:", round(w_hilic$p.value, 4), "\n")
-    cat("Median 0R:", round(median(race_data$`MPA..HILIC.`[race_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
-    cat("Median 2R+:", round(median(race_data$`MPA..HILIC.`[race_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
+    cat("Median 0R:", round(median(race_data$`Mycophenolate..HILIC.`[race_data$ACR_Group == "0R"], na.rm = TRUE), 3), "\n")
+    cat("Median 2R+:", round(median(race_data$`Mycophenolate..HILIC.`[race_data$ACR_Group == "2R+"], na.rm = TRUE), 3), "\n\n")
     
     # Create plot
     race_long <- race_data %>%
-        pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+        pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                      names_to = "Metabolite",
                      values_to = "Level") %>%
         mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
@@ -172,7 +172,7 @@ cat("\n=== CREATING COMBINED RACE COMPARISON PLOT ===\n\n")
 # Create a combined plot showing all races together
 mmf_race_long <- mmf_race_data %>%
     filter(!is.na(Race)) %>%
-    pivot_longer(cols = c(`MPA..C18.`, `MPA..HILIC.`),
+    pivot_longer(cols = c(`Mycophenolate..C18.`, `Mycophenolate..HILIC.`),
                  names_to = "Metabolite",
                  values_to = "Level") %>%
     mutate(Metabolite = gsub("\\.\\.", " ", Metabolite))
