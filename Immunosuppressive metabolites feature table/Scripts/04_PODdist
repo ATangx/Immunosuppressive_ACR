@@ -124,12 +124,13 @@ print(p4)
 p5 <- nonlog2_data %>%
     group_by(H) %>%
     mutate(
-        H_ordered = reorder(H, POD, median),
+        H_numeric = as.numeric(gsub("H", "", H)),  # Extract numeric part of H
         has_2R = any(grepl("^2R", ACR, ignore.case = TRUE)),
         n_samples = n()
     ) %>%
     ungroup() %>%
     filter(n_samples > 1) %>%  # Only show patients with multiple samples
+    mutate(H_ordered = fct_reorder(H, H_numeric)) %>%  # Order by H number
     ggplot(aes(x = POD, y = H_ordered)) +
     geom_line(aes(group = H_ordered), color = "gray70", alpha = 0.8, size = 0.8) +
     geom_point(aes(color = ACR, shape = has_2R), size = 2.5, alpha = 0.8) +
@@ -142,6 +143,7 @@ p5 <- nonlog2_data %>%
         labels = c("Never 2R", "Had 2R"),
         name = "Rejection Status"
     ) +
+    scale_y_discrete(limits = rev) +  # Reverse so smallest H is at top
     labs(
         title = "Patient Trajectories: POD Sampling Timeline",
         subtitle = "Connected lines show multiple samples from same patient",
