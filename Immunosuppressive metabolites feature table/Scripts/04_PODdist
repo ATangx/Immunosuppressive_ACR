@@ -134,12 +134,12 @@ p5 <- nonlog2_data %>%
     geom_line(aes(group = H_ordered), color = "gray70", alpha = 0.8, size = 0.8) +
     geom_point(aes(color = ACR, shape = has_2R), size = 2.5, alpha = 0.8) +
     scale_color_manual(
-        values = c("0R" = "#2E8B57", "1R" = "#CD853F", "2R" = "#B22222", "2RB" = "#8B0000"),
+        values = c("0R" = "#2E8B57", "1R" = "#4A90E2", "2R+" = "#B22222"),
         name = "ACR Grade"
     ) +
     scale_shape_manual(
         values = c("FALSE" = 16, "TRUE" = 17),
-        labels = c("No 2R", "Has 2R"),
+        labels = c("Never 2R", "Had 2R"),
         name = "Rejection Status"
     ) +
     labs(
